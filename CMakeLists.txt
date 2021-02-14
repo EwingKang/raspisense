@@ -1,11 +1,20 @@
-cmake_minimum_required (VERSION 2.8) 
-project (raspicam_test)
+cmake_minimum_required (VERSION 3.10) 
+project (raspicam_test 
+    VERSION 0.1.0 
+    LANGUAGES CXX
+)
 
 # Required packages
 find_package(raspicam REQUIRED)
 message( "Raspcam lib: ${raspicam_INCLUDE_DIR}" )
 find_package(OpenCV REQUIRED)
 message( "Open CV version: ${OpenCV_VERSION}" )
+
+# External libs
+add_subdirectory(lib/cxxopts)
+
+cmake_policy(SET CMP0048 OLD)
+add_subdirectory(lib/serial)
 
 # Executables
 add_executable(simpletest_raspicam 

@@ -1,0 +1,6 @@
+[submodule "lib/serial"]
+	path = lib/serial
+	url = https://github.com/wjwwood/serial.git
+[submodule "lib/cxxopts"]
+	path = lib/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
