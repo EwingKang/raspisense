@@ -34,3 +34,15 @@ target_link_libraries (simpletest_raspicam_cv
   ${raspicam_CV_LIBS}
   ${OpenCV_LIBS}
 )
+
+
+add_executable(simple_m8n_test
+	module/ublox_neo_m8n-gps/gps.cpp
+)
+target_include_directories(simple_m8n_test
+  PUBLIC
+	lib/serial/include/
+)
+target_link_libraries(simple_m8n_test
+	serial
+)
