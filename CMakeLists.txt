@@ -16,6 +16,8 @@ add_subdirectory(lib/cxxopts)
 cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
+add_compile_options(-Wall -Wextra -pedantic)
+
 # Executables
 add_executable(simpletest_raspicam 
 	src/simpletest_raspicam_main.cpp

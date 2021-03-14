@@ -1,0 +1,20 @@
+{
+  "name": "raspisnse",
+  "files": [ {
+    "directory": "",
+    "recursive": 1,
+    "fileters": ["*.cpp", "*.hpp", "*.c", "*.h", "*.txt", "*.kateproject"]
+  } ],
+  "build": {
+      "directory": "./build",
+      "targets": [
+        { "name": "cmake", "build_cmd": "cmake -G Ninja .."},
+        { "name": "debug", "build_cmd": "cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug"},
+        { "name": "release", "build_cmd": "cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release"},
+        { "name": "build", "build_cmd": "ninja -j4"},
+        { "name": "clean", "build_cmd": "ninja clean"} ],
+      "default_target": "cmake",
+      "clean_target": "clean"
+      },
+  "ctags": {"enable": 1}
+}
