@@ -39,8 +39,10 @@
 	WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 	SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+#include <iostream>
 
 #include "ublox_gnss_library.h"
+
 
 SFE_UBLOX_GNSS::SFE_UBLOX_GNSS(void)
 {
@@ -127,7 +129,7 @@ bool SFE_UBLOX_GNSS::begin(TwoWire &wirePort, uint8_t deviceAddress)
 }
 
 //Initialize the Serial port
-bool SFE_UBLOX_GNSS::begin(Stream &serialPort)
+bool SFE_UBLOX_GNSS::begin(Serial &serialPort)
 {
 	commType = COMM_TYPE_SERIAL;
 	_serialPort = &serialPort; //Grab which port the user wants us to use
@@ -189,7 +191,7 @@ bool SFE_UBLOX_GNSS::isConnected(uint16_t maxWait)
 
 //Enable or disable the printing of sent/response HEX values.
 //Use this in conjunction with 'Transport Logging' from the Universal Reader Assistant to see what they're doing that we're not
-void SFE_UBLOX_GNSS::enableDebugging(Stream &debugPort, bool printLimitedDebug)
+void SFE_UBLOX_GNSS::enableDebugging(Serial &debugPort, bool printLimitedDebug)
 {
 	_debugSerial = &debugPort; //Grab which port the user wants us to use for debugging
 	if (printLimitedDebug == false)
@@ -3357,7 +3359,7 @@ bool SFE_UBLOX_GNSS::setSPIOutput(uint8_t comSettings, uint16_t maxWait)
 }
 
 //Want to see the NMEA messages on the Serial port? Here's how
-void SFE_UBLOX_GNSS::setNMEAOutputPort(Stream &nmeaOutputPort)
+void SFE_UBLOX_GNSS::setNMEAOutputPort(Serial &nmeaOutputPort)
 {
 	_nmeaOutputPort = &nmeaOutputPort; //Store the port from user
 }

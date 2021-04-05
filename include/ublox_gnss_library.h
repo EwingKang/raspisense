@@ -39,6 +39,16 @@
 	WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 	SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+/*
+ * EWING modified
+ * Stream library -> Serial library
+ * Note: functions required
+ *   [] _serialPort->write()
+ *   [o] _serialPort->available()
+ *   [] _serialPort->read()
+ *   [] _debugSerial->print()
+ *   [] digitalWrite
+ */
 
 #ifndef UBLOX_GNSS_LIBRARY_H
 #define UBLOX_GNSS_LIBRARY_H
@@ -47,6 +57,9 @@
 #include "ublox_config_keys.h"
 #include "ublox_structs.h"
 #include "ublox_class_id.h"
+
+// serial library from wjwood
+#include "serial.h"
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -192,7 +205,7 @@ public:
 	//By default use the default I2C address, and use Wire port
 	bool begin(TwoWire &wirePort = Wire, uint8_t deviceAddress = 0x42); //Returns true if module is detected
 	//serialPort needs to be perviously initialized to correct baud rate
-	bool begin(Stream &serialPort); //Returns true if module is detected
+	bool begin(Serial &serialPort); //Returns true if module is detected
 
 	void setI2CpollingWait(uint8_t newPollingWait_ms); // Allow the user to change the I2C polling wait if required
 
@@ -206,7 +219,7 @@ public:
 	//Returns true if device answers on _gpsI2Caddress address or via Serial
 	bool isConnected(uint16_t maxWait = 1100);
 
-	// Enable debug messages using the chosen Serial port (Stream)
+	// Enable debug messages using the chosen Serial port (Serial)
 	// Boards like the RedBoard Turbo use SerialUSB (not Serial).
 	// But other boards like the SAMD51 Thing Plus use Serial (not SerialUSB).
 	// These lines let the code compile cleanly on as many SAMD boards as possible.
@@ -214,18 +227,18 @@ public:
 	#if defined(USB_VID)						// Is the USB Vendor ID defined?
 	#if (USB_VID == 0x1B4F)					// Is this a SparkFun board?
 	#if !defined(ARDUINO_SAMD51_THING_PLUS) & !defined(ARDUINO_SAMD51_MICROMOD) // If it is not a SAMD51 Thing Plus or SAMD51 MicroMod
-	void enableDebugging(Stream &debugPort = SerialUSB, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort = SerialUSB, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#else
-	void enableDebugging(Stream &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Stream &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Stream &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Stream &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 
 	void disableDebugging(void); //Turn off debug statements
@@ -295,7 +308,7 @@ public:
 	bool setUART2Output(uint8_t comSettings, uint16_t maxWait = defaultMaxWait); //Configure UART2 port to output UBX, NMEA, RTCM3 or a combination thereof
 	bool setUSBOutput(uint8_t comSettings, uint16_t maxWait = defaultMaxWait);				//Configure USB port to output UBX, NMEA, RTCM3 or a combination thereof
 	bool setSPIOutput(uint8_t comSettings, uint16_t maxWait = defaultMaxWait);				//Configure SPI port to output UBX, NMEA, RTCM3 or a combination thereof
-	void setNMEAOutputPort(Stream &nmeaOutputPort);																 //Sets the internal variable for the port to direct NMEA characters to
+	void setNMEAOutputPort(Serial &nmeaOutputPort);																 //Sets the internal variable for the port to direct NMEA characters to
 
 	//Reset to defaults
 
@@ -846,9 +859,9 @@ private:
 
 	//Variables
 	TwoWire *_i2cPort;				//The generic connection to user's chosen I2C hardware
-	Stream *_serialPort;			//The generic connection to user's chosen Serial hardware
-	Stream *_nmeaOutputPort = NULL; //The user can assign an output port to print NMEA sentences if they wish
-	Stream *_debugSerial;			//The stream to send debug messages to if enabled
+	Serial *_serialPort;			//The generic connection to user's chosen Serial hardware
+	Serial *_nmeaOutputPort = NULL; //The user can assign an output port to print NMEA sentences if they wish
+	Serial *_debugSerial;			//The stream to send debug messages to if enabled
 
 	uint8_t _gpsI2Caddress = 0x42; //Default 7-bit unshifted address of the ublox 6/7/8/M8/F9 series
 	//This can be changed using the ublox configuration software

@@ -4,6 +4,6 @@
 [submodule "lib/cxxopts"]
 	path = lib/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
-[submodule "module/ublox_neo_m8n-gps"]
-	path = module/ublox_neo_m8n-gps
-	url = https://github.com/bartashevich/UBLOX-NEO-M8N-GPS.git
+[submodule "module/spdlog"]
+	path = lib/spdlog
+	url = https://github.com/gabime/spdlog.git

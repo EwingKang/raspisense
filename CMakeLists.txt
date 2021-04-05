@@ -12,6 +12,7 @@ message( "Open CV version: ${OpenCV_VERSION}" )
 
 # External libs
 add_subdirectory(lib/cxxopts)
+add_subdirectory(lib/spdlog)
 
 cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
@@ -39,7 +40,7 @@ target_link_libraries (simpletest_raspicam_cv
 
 
 add_executable(simple_m8n_test
-	module/ublox_neo_m8n-gps/gps.cpp
+	src/simpletest_m8n.cpp
 )
 target_include_directories(simple_m8n_test
   PUBLIC
