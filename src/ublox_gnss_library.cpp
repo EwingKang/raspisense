@@ -40,6 +40,7 @@
 	SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 #include <iostream>
+#include <algorithm>
 
 #include "ublox_gnss_library.h"
 
@@ -449,9 +450,13 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 //Checks Serial for data, passing any new bytes to process()
 bool SFE_UBLOX_GNSS::checkUbloxSerial(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID)
 {
-	while (_serialPort->available())
+	// TODO Ewing: process packets one by one is pretty ugly. Maybe I can tightly couple the bufferes.
+	uint8_t buf[1024];
+	size_t avail = _serialPort->available();
+	_serialPort->read(buf, std::min(avail, 1024));
+	for(unsigned int i=0; i<std::min(avail, 1024); i++)
 	{
-		process(_serialPort->read(), incomingUBX, requestedClass, requestedID);
+		process(buf[i], incomingUBX, requestedClass, requestedID);
 	}
 	return (true);
 
@@ -2326,8 +2331,22 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendI2cCommand(ubxPacket *outgoingUBX, uint16
 //Given a packet and payload, send everything including CRC bytesA via Serial port
 void SFE_UBLOX_GNSS::sendSerialCommand(ubxPacket *outgoingUBX)
 {
+	uint8_t buf[1024]; // In ubx lib: MAX_PAYLOAD_SIZE + header and checksum
 	//Write header bytes
-	_serialPort->write(UBX_SYNCH_1); //μ - oh ublox, you're funny. I will call you micro-blox from now on.
+	buf[0] = UBX_SYNCH_1;
+	buf[1] = UBX_SYNCH_2;
+	buf[2] = outgoingUBX->cls;
+	buf[3] = outgoingUBX->id;
+	buf[4] = outgoingUBX->len & 0xFF;
+	buf[5] = outgoingUBX->len >> 8;
+	
+	memcpy(buf+6, outgoingUBX->payload, outgoingUBX->len)
+	
+	buf[6+outgoingUBX->len] = outgoingUBX->checksumA;
+	buf[7+outgoingUBX->len] = outgoingUBX->checksumB;
+	_serialPort->write(buf, 8+outgoingUBX->len);
+	
+	/*_serialPort->write(UBX_SYNCH_1); //μ - oh ublox, you're funny. I will call you micro-blox from now on.
 	_serialPort->write(UBX_SYNCH_2); //b
 	_serialPort->write(outgoingUBX->cls);
 	_serialPort->write(outgoingUBX->id);
@@ -2342,7 +2361,7 @@ void SFE_UBLOX_GNSS::sendSerialCommand(ubxPacket *outgoingUBX)
 
 	//Write checksum
 	_serialPort->write(outgoingUBX->checksumA);
-	_serialPort->write(outgoingUBX->checksumB);
+	_serialPort->write(outgoingUBX->checksumB);*/
 }
 
 //Pretty prints the current ubxPacket

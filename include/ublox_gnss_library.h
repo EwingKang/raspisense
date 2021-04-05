@@ -43,11 +43,12 @@
  * EWING modified
  * Stream library -> Serial library
  * Note: functions required
- *   [] _serialPort->write()
+ *   [o] _serialPort->write()
  *   [o] _serialPort->available()
- *   [] _serialPort->read()
+ *   [o] _serialPort->read()
  *   [] _debugSerial->print()
  *   [] digitalWrite
+ *   [] _i2cPort->*
  */
 
 #ifndef UBLOX_GNSS_LIBRARY_H
