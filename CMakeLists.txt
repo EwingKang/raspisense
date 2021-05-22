@@ -10,6 +10,9 @@ message( "Raspcam lib: ${raspicam_INCLUDE_DIR}" )
 find_package(OpenCV REQUIRED)
 message( "Open CV version: ${OpenCV_VERSION}" )
 
+find_library(wiringPi_LIB wiringPi)
+message( "Find WiringPI lib" )
+
 # External libs
 add_subdirectory(lib/cxxopts)
 add_subdirectory(lib/spdlog)
@@ -18,6 +21,21 @@ cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
 add_compile_options(-Wall -Wextra -pedantic)
+
+# library
+add_library(ublox_gnss_library
+	src/ublox_gnss_library.cpp)
+target_include_directories(ublox_gnss_library 
+  PUBLIC
+	include/
+  PRIVATE
+	lib/serial/include/
+)
+target_link_libraries(ublox_gnss_library
+	${wiringPi_LIB}
+	spdlog
+	serial
+)
 
 # Executables
 add_executable(simpletest_raspicam 

@@ -43,7 +43,7 @@
 #ifndef __u_blox_structs_h__
 #define __u_blox_structs_h__
 
-#include "SparkFun_u-blox_GNSS_Arduino_Library.h"
+//#include "SparkFun_u-blox_GNSS_Arduino_Library.h"
 
 #ifndef DEF_NUM_SENS
 #define DEF_NUM_SENS 7 // The maximum number of ESF sensors
@@ -1037,7 +1037,7 @@ typedef struct
 {
 	ubxAutomaticFlags automaticFlags;
   UBX_RXM_SFRBX_data_t data;
-  boolean moduleQueried;
+  bool moduleQueried;
   void (*callbackPointer)(UBX_RXM_SFRBX_data_t);
   UBX_RXM_SFRBX_data_t  *callbackData;
 } UBX_RXM_SFRBX_t;
@@ -1104,7 +1104,7 @@ typedef struct
 {
 	ubxAutomaticFlags automaticFlags;
   UBX_RXM_RAWX_data_t data;
-  boolean moduleQueried;
+  bool moduleQueried;
   void (*callbackPointer)(UBX_RXM_RAWX_data_t);
   UBX_RXM_RAWX_data_t  *callbackData;
 } UBX_RXM_RAWX_t;

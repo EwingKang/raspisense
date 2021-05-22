@@ -46,9 +46,12 @@
  *   [o] _serialPort->write()
  *   [o] _serialPort->available()
  *   [o] _serialPort->read()
- *   [] _debugSerial->print()
- *   [] digitalWrite
- *   [] _i2cPort->*
+ *   [o] _debugSerial->print()
+ *        [o] statusString()
+ *   [O] digitalWrite
+ *   [o] _i2cPort->*
+ *   [o] wiringPiSetup()
+ *   [o]-lwiringPi 
  */
 
 #ifndef UBLOX_GNSS_LIBRARY_H
@@ -60,8 +63,8 @@
 #include "ublox_class_id.h"
 
 // serial library from wjwood
-#include "serial.h"
-
+#include "serial/serial.h"
+using namespace serial;
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 //Define a digital pin to aid debugging
@@ -204,7 +207,9 @@ public:
 	void setPacketCfgPayloadSize(size_t payloadSize); // Set packetCfgPayloadSize
 
 	//By default use the default I2C address, and use Wire port
-	bool begin(TwoWire &wirePort = Wire, uint8_t deviceAddress = 0x42); //Returns true if module is detected
+	//bool begin(TwoWire &wirePort = Wire, uint8_t deviceAddress = 0x42); //Returns true if module is detected
+	bool begin(uint8_t deviceAddress);
+	
 	//serialPort needs to be perviously initialized to correct baud rate
 	bool begin(Serial &serialPort); //Returns true if module is detected
 
@@ -228,18 +233,18 @@ public:
 	#if defined(USB_VID)						// Is the USB Vendor ID defined?
 	#if (USB_VID == 0x1B4F)					// Is this a SparkFun board?
 	#if !defined(ARDUINO_SAMD51_THING_PLUS) & !defined(ARDUINO_SAMD51_MICROMOD) // If it is not a SAMD51 Thing Plus or SAMD51 MicroMod
-	void enableDebugging(Serial &debugPort = SerialUSB, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#else
-	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 	#else
-	void enableDebugging(Serial &debugPort = Serial, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
+	void enableDebugging(Serial &debugPort, bool printLimitedDebug = false); //Given a port to print to, enable debug messages. Default to all, not limited.
 	#endif
 
 	void disableDebugging(void); //Turn off debug statements
@@ -255,7 +260,7 @@ public:
 	//Will default to using packetCfg to look for explicit autoPVT packets so they get processed correctly by processUBX
 	bool checkUblox(uint8_t requestedClass = 0, uint8_t requestedID = 0); //Checks module with user selected commType
 
-	bool checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID);	   //Method for I2C polling of data, passing any new bytes to process()
+	//bool checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID);	   //Method for I2C polling of data, passing any new bytes to process()
 	bool checkUbloxSerial(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID); //Method for serial polling of data, passing any new bytes to process()
 
 	// Process the incoming data
@@ -304,7 +309,7 @@ public:
 	bool setI2CAddress(uint8_t deviceAddress, uint16_t maxTime = defaultMaxWait);										 //Changes the I2C address of the u-blox module
 	void setSerialRate(uint32_t baudrate, uint8_t uartPort = COM_PORT_UART1, uint16_t maxTime = defaultMaxWait); //Changes the serial baud rate of the u-blox module, uartPort should be COM_PORT_UART1/2
 
-	bool setI2COutput(uint8_t comSettings, uint16_t maxWait = defaultMaxWait);				//Configure I2C port to output UBX, NMEA, RTCM3 or a combination thereof
+	//bool setI2COutput(uint8_t comSettings, uint16_t maxWait = defaultMaxWait);				//Configure I2C port to output UBX, NMEA, RTCM3 or a combination thereof
 	bool setUART1Output(uint8_t comSettings, uint16_t maxWait = defaultMaxWait); //Configure UART1 port to output UBX, NMEA, RTCM3 or a combination thereof
 	bool setUART2Output(uint8_t comSettings, uint16_t maxWait = defaultMaxWait); //Configure UART2 port to output UBX, NMEA, RTCM3 or a combination thereof
 	bool setUSBOutput(uint8_t comSettings, uint16_t maxWait = defaultMaxWait);				//Configure USB port to output UBX, NMEA, RTCM3 or a combination thereof
@@ -350,7 +355,7 @@ public:
 	moduleSWVersion_t *moduleSWVersion = NULL; // Pointer to struct. RAM will be allocated for this if/when necessary
 
 	//Support for geofences
-	bool addGeofence(int32_t latitude, int32_t longitude, uint32_t radius, byte confidence = 0, byte pinPolarity = 0, byte pin = 0, uint16_t maxWait = defaultMaxWait); // Add a new geofence
+	bool addGeofence(int32_t latitude, int32_t longitude, uint32_t radius, uint8_t confidence = 0, uint8_t pinPolarity = 0, uint8_t pin = 0, uint16_t maxWait = defaultMaxWait); // Add a new geofence
 	bool clearGeofences(uint16_t maxWait = defaultMaxWait); //Clears all geofences
 	bool clearAntPIO(uint16_t maxWait = defaultMaxWait); //Clears the antenna control pin settings to release the PIOs
 	bool getGeofenceState(geofenceState &currentGeofenceState, uint16_t maxWait = defaultMaxWait); //Returns the combined geofence state
@@ -859,7 +864,8 @@ private:
 	bool initPacketUBXHNRPVT(); // Allocate RAM for packetUBXHNRPVT and initialize it
 
 	//Variables
-	TwoWire *_i2cPort;				//The generic connection to user's chosen I2C hardware
+	//TwoWire *_i2cPort;				//The generic connection to user's chosen I2C hardware
+	int _i2cFd;
 	Serial *_serialPort;			//The generic connection to user's chosen Serial hardware
 	Serial *_nmeaOutputPort = NULL; //The user can assign an output port to print NMEA sentences if they wish
 	Serial *_debugSerial;			//The stream to send debug messages to if enabled
