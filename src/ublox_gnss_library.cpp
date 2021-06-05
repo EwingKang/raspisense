@@ -43,12 +43,18 @@
 #include <algorithm>
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
+#include "spdlog/formatter.h"
+#include "spdlog/pattern_formatter.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "ublox_gnss_library.h"
 
 // For GPIO control
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
+
+
+static std::shared_ptr<spdlog::logger> p_nmea_logger;
 
 SFE_UBLOX_GNSS::SFE_UBLOX_GNSS(void)
 {
@@ -219,6 +225,15 @@ void SFE_UBLOX_GNSS::enableDebugging(Serial &debugPort, bool printLimitedDebug)
 	{
 		_printLimitedDebug = true; //Should we print limited debug messages? Good for debugging high navigation rates
 	}
+	//spdlog::default_logger()->setlevel(spdlog::level::);
+	spdlog::set_level(spdlog::level::debug);
+	spdlog::default_logger()->set_pattern("%v"); // disable time
+	spdlog::debug("Enable debug logging");
+	p_nmea_logger = spdlog::stdout_color_mt("NMEA_LOGGER");
+	//spdlog::formatter f = std::make_shared<spdlog::pattern_formatter>("%v",  std::string(""));  // disable eol
+	auto f = std::make_unique<spdlog::pattern_formatter>("%v", spdlog::pattern_time_type::local, std::string(""));  // disable eol
+	p_nmea_logger->set_formatter( std::move(f) );
+	p_nmea_logger->set_level(spdlog::level::debug);
 }
 void SFE_UBLOX_GNSS::disableDebugging(void)
 {
@@ -1001,6 +1016,7 @@ void SFE_UBLOX_GNSS::processNMEA(char incoming)
 	//If user has assigned an output port then pipe the characters there
 	if (_nmeaOutputPort != NULL)
 		_nmeaOutputPort->write((uint8_t *)&incoming,1); //Echo this byte to the serial port
+	p_nmea_logger->debug(incoming);
 }
 
 //We need to be able to identify an RTCM packet and then the length
@@ -2299,6 +2315,12 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendCommand(ubxPacket *outgoingUBX, uint16_t 
 }
 
 //Returns false if sensor fails to respond to I2C traffic
+sfe_ublox_status_e SFE_UBLOX_GNSS::sendI2cCommand(ubxPacket *outgoingUBX, uint16_t maxWait)
+{
+	(void) outgoingUBX;
+	(void) maxWait;
+	return (SFE_UBLOX_STATUS_I2C_COMM_FAILURE);
+}
 /*sfe_ublox_status_e SFE_UBLOX_GNSS::sendI2cCommand(ubxPacket *outgoingUBX, uint16_t maxWait)
 {
 	//Point at 0xFF data register

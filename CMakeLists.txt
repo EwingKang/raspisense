@@ -56,7 +56,7 @@ target_link_libraries (simpletest_raspicam_cv
   ${OpenCV_LIBS}
 )
 
-
+# TODO: dont' include serial manually?
 add_executable(simple_m8n_test
 	src/simpletest_m8n.cpp
 )
@@ -66,4 +66,17 @@ target_include_directories(simple_m8n_test
 )
 target_link_libraries(simple_m8n_test
 	serial
+)
+
+add_executable(m8n_test
+	src/m8n_test_main.cpp 
+	)
+target_include_directories(m8n_test
+  PUBLIC
+	lib/serial/include/
+)
+target_link_libraries(m8n_test
+	serial
+	ublox_gnss_library
+	cxxopts
 )
