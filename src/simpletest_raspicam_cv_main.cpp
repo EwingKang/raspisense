@@ -4,8 +4,10 @@
 #include <opencv2/opencv.hpp>
 using namespace std; 
  
-int main ( int argc,char **argv ) {
-   
+int main ( int argc,char **argv ) 
+{
+	(void) argc;
+	(void) argv;
     time_t timer_begin,timer_end;
     raspicam::RaspiCam_Cv Camera;
     cv::Mat image;

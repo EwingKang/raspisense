@@ -248,6 +248,7 @@ public:
 	#endif
 
 	void disableDebugging(void); //Turn off debug statements
+	void disableNmeaDebugPrint(void); //Turn off cli printing of NMEA debug message
 	void debugPrint(char *message); //Safely print debug statements
 	void debugPrintln(char *message); //Safely print debug statements
 	const char *statusString(sfe_ublox_status_e stat); //Pretty print the return value

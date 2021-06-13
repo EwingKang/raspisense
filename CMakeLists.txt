@@ -17,7 +17,7 @@ message( "Find WiringPI lib" )
 add_subdirectory(lib/cxxopts)
 add_subdirectory(lib/spdlog)
 
-cmake_policy(SET CMP0048 OLD)
+#cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
 add_compile_options(-Wall -Wextra -pedantic)

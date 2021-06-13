@@ -8,6 +8,8 @@
  
 int main ( int argc,char **argv)
 {
+	(void) argc;
+	(void) argv;
 	using namespace std;
 	raspicam::RaspiCam Camera; //Cmaera object
 	//Open camera 

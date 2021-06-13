@@ -54,6 +54,7 @@
 #include <wiringPiI2C.h>
 
 
+static std::shared_ptr<spdlog::logger> p_dbg_logger;
 static std::shared_ptr<spdlog::logger> p_nmea_logger;
 
 SFE_UBLOX_GNSS::SFE_UBLOX_GNSS(void)
@@ -77,7 +78,7 @@ void SFE_UBLOX_GNSS::setPacketCfgPayloadSize(size_t payloadSize)
 		payloadCfg = NULL; // Redundant?
 		packetCfg.payload = payloadCfg;
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setPacketCfgPayloadSize: Zero payloadSize! This will end _very_ badly...");
+			p_dbg_logger->debug("setPacketCfgPayloadSize: Zero payloadSize! This will end _very_ badly...");
 	}
 
 	else if (payloadCfg == NULL) //Memory has not yet been allocated - so use new
@@ -86,7 +87,7 @@ void SFE_UBLOX_GNSS::setPacketCfgPayloadSize(size_t payloadSize)
 		packetCfg.payload = payloadCfg;
 		if (payloadCfg == NULL)
 			if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-				spdlog::debug("setPacketCfgPayloadSize: PANIC! RAM allocation failed! This will end _very_ badly...");
+				p_dbg_logger->debug("setPacketCfgPayloadSize: PANIC! RAM allocation failed! This will end _very_ badly...");
 	}
 
 	else //Memory has already been allocated - so resize
@@ -99,7 +100,7 @@ void SFE_UBLOX_GNSS::setPacketCfgPayloadSize(size_t payloadSize)
 		packetCfg.payload = payloadCfg;
 		if (payloadCfg == NULL)
 			if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-				spdlog::debug("setPacketCfgPayloadSize: PANIC! RAM resize failed! This will end _very_ badly...");
+				p_dbg_logger->debug("setPacketCfgPayloadSize: PANIC! RAM resize failed! This will end _very_ badly...");
 	}
 
 	packetCfgPayloadSize = payloadSize;
@@ -225,12 +226,19 @@ void SFE_UBLOX_GNSS::enableDebugging(Serial &debugPort, bool printLimitedDebug)
 	{
 		_printLimitedDebug = true; //Should we print limited debug messages? Good for debugging high navigation rates
 	}
+	
+	// Debug logger
 	//spdlog::default_logger()->setlevel(spdlog::level::);
-	spdlog::set_level(spdlog::level::debug);
-	spdlog::default_logger()->set_pattern("%v"); // disable time
-	spdlog::debug("Enable debug logging");
+	//spdlog::set_level(spdlog::level::debug);
+	//spdlog::default_logger()->set_pattern("%v"); // disable time
+	//spdlog::default_logger()->sinks().push_back(some_sink);
+	p_dbg_logger = spdlog::stdout_color_mt("UBX_LOGGER");
+	p_dbg_logger->set_level(spdlog::level::debug);
+	p_dbg_logger->set_pattern("%v"); // disable time
+	p_dbg_logger->debug("Enable debug logging");
+	
+	// NMEA logger
 	p_nmea_logger = spdlog::stdout_color_mt("NMEA_LOGGER");
-	//spdlog::formatter f = std::make_shared<spdlog::pattern_formatter>("%v",  std::string(""));  // disable eol
 	auto f = std::make_unique<spdlog::pattern_formatter>("%v", spdlog::pattern_time_type::local, std::string(""));  // disable eol
 	p_nmea_logger->set_formatter( std::move(f) );
 	p_nmea_logger->set_level(spdlog::level::debug);
@@ -239,6 +247,11 @@ void SFE_UBLOX_GNSS::disableDebugging(void)
 {
 	_printDebug = false; //Turn off extra print statements
 	_printLimitedDebug = false;
+	disableNmeaDebugPrint();
+}
+void SFE_UBLOX_GNSS::disableNmeaDebugPrint(void)
+{
+	p_nmea_logger->set_level(spdlog::level::info);
 }
 
 //Safely print messages
@@ -247,7 +260,7 @@ void SFE_UBLOX_GNSS::debugPrint(char *message)
 	if (_printDebug == true)
 	{
 		//_debugSerial->print(message);
-		spdlog::debug(std::string(message));
+		p_dbg_logger->debug(std::string(message));
 	}
 }
 //Safely print messages
@@ -256,7 +269,7 @@ void SFE_UBLOX_GNSS::debugPrintln(char *message)
 	if (_printDebug == true)
 	{
 		//_debugSerial->println(message);
-		spdlog::debug(std::string(message));
+		p_dbg_logger->debug(std::string(message));
 	}
 }
 
@@ -366,7 +379,7 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 				//I believe this is a u-blox bug. Device should never present an 0xFF.
 				if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 				{
-					spdlog::debug("checkUbloxI2C: u-blox bug, length lsb is 0xFF"));
+					p_dbg_logger->debug("checkUbloxI2C: u-blox bug, length lsb is 0xFF"));
 				}
 				if (debugPin >= 0)
 				{
@@ -384,7 +397,7 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("checkUbloxI2C: OK, zero bytes available"));
+				p_dbg_logger->debug("checkUbloxI2C: OK, zero bytes available"));
 			}
 			lastCheck = millis(); //Put off checking to avoid I2C bus traffic
 			return (false);
@@ -400,7 +413,7 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 
 			if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 			{
-				spdlog::debug("checkUbloxI2C: Bytes available error: {}", bytesAvailable);
+				p_dbg_logger->debug("checkUbloxI2C: Bytes available error: {}", bytesAvailable);
 				if (debugPin >= 0)
 				{
 					digitalWrite((uint8_t)debugPin, LOW);
@@ -414,14 +427,14 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("checkUbloxI2C: Large packet of {} bytes received", bytesAvailable);
+				p_dbg_logger->debug("checkUbloxI2C: Large packet of {} bytes received", bytesAvailable);
 			}
 		}
 		else
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("checkUbloxI2C: Reading {} bytes", bytesAvailable);
+				p_dbg_logger->debug("checkUbloxI2C: Reading {} bytes", bytesAvailable);
 			}
 		}
 
@@ -455,7 +468,7 @@ bool SFE_UBLOX_GNSS::checkUbloxI2C(ubxPacket *incomingUBX, uint8_t requestedClas
 						{
 							if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 							{
-								spdlog::debug("checkUbloxU2C: u-blox error, module not ready with data (7F error)"));
+								p_dbg_logger->debug("checkUbloxU2C: u-blox error, module not ready with data (7F error)"));
 							}
 							delay(5); //In logic analyzation, the module starting responding after 1.48ms
 							if (debugPin >= 0)
@@ -837,7 +850,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 					{
 						if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 						{
-							spdlog::debug("process: getMaxPayloadSize returned ZERO!! Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
+							p_dbg_logger->debug("process: getMaxPayloadSize returned ZERO!! Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
 							//_debugSerial->print(F("process: getMaxPayloadSize returned ZERO!! Class: 0x"));
 							//_debugSerial->print(packetBuf.cls);
 							//_debugSerial->print(F(" ID: 0x"));
@@ -848,7 +861,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 					{
 						if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 						{
-							spdlog::debug("process: memory is already allocated for payloadAuto! Deleting...");
+							p_dbg_logger->debug("process: memory is already allocated for payloadAuto! Deleting...");
 						}
 						delete[] payloadAuto;
 						payloadAuto = NULL; // Redundant?
@@ -860,12 +873,12 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 					{
 						if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 						{
-							spdlog::debug("process: memory allocation failed for \"automatic\" message: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
+							p_dbg_logger->debug("process: memory allocation failed for \"automatic\" message: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
 							//_debugSerial->print(F("process: memory allocation failed for \"automatic\" message: Class: 0x"));
 							//_debugSerial->print(packetBuf.cls, HEX);
 							//_debugSerial->print(F(" ID: 0x"));
 							//_debugSerial->println(packetBuf.id, HEX);
-							spdlog::debug("process: \"automatic\" message could overwrite data");
+							p_dbg_logger->debug("process: \"automatic\" message could overwrite data");
 						}
 						// The RAM allocation failed so fall back to using incomingUBX (usually packetCfg) even though we risk overwriting data
 						activePacketBuffer = SFE_UBLOX_PACKET_PACKETCFG;
@@ -883,7 +896,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 						packetAuto.startingSpot = packetBuf.startingSpot; //And the starting spot? (Probably redundant)
 						if (_printDebug == true)
 						{
-							spdlog::debug("process: incoming \"automatic\" message: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
+							p_dbg_logger->debug("process: incoming \"automatic\" message: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
 							//_debugSerial->print(F("process: incoming \"automatic\" message: Class: 0x"));
 							//_debugSerial->print(packetBuf.cls, HEX);
 							//_debugSerial->print(F(" ID: 0x"));
@@ -921,7 +934,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 			{
 				if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 				{
-					spdlog::debug("process: ZERO LENGTH packet received: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
+					p_dbg_logger->debug("process: ZERO LENGTH packet received: Class: 0x{0:x}  ID: 0x{1:x}", packetBuf.cls, packetBuf.id);
 					//_debugSerial->print(F("process: ZERO LENGTH packet received: Class: 0x"));
 					//_debugSerial->print(packetBuf.cls, HEX);
 					//_debugSerial->print(F(" ID: 0x"));
@@ -973,7 +986,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 				{
 					if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 					{
-						spdlog::debug("process: ACK received with .len != 2: Class: 0x{0:x}  ID: 0x{1:x} len: {2:d}", packetBuf.payload[0], packetBuf.payload[1], packetBuf.len);
+						p_dbg_logger->debug("process: ACK received with .len != 2: Class: 0x{0:x}  ID: 0x{1:x} len: {2:d}", packetBuf.payload[0], packetBuf.payload[1], packetBuf.len);
 						//_debugSerial->print(F("process: ACK received with .len != 2: Class: 0x"));
 						//_debugSerial->print(packetBuf.payload[0], HEX);
 						//_debugSerial->print(F(" ID: 0x"));
@@ -1105,7 +1118,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 			{
 				if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 				{
-					spdlog::debug("processUBX: getMaxPayloadSize returned ZERO!! Class: 0x{0:x}  ID: 0x{1:x}", incomingUBX->cls, incomingUBX->id);
+					p_dbg_logger->debug("processUBX: getMaxPayloadSize returned ZERO!! Class: 0x{0:x}  ID: 0x{1:x}", incomingUBX->cls, incomingUBX->id);
 					//_debugSerial->print(F("processUBX: getMaxPayloadSize returned ZERO!! Class: 0x"));
 					//_debugSerial->print(incomingUBX->cls);
 					//_debugSerial->print(F(" ID: 0x"));
@@ -1176,7 +1189,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 				incomingUBX->classAndIDmatch = SFE_UBLOX_PACKET_NOTACKNOWLEDGED; // If we have a match, set the classAndIDmatch flag to NOTACKNOWLEDGED
 				if (_printDebug == true)
 				{
-					spdlog::debug("processUBX: NACK received: Requested Class: 0x{0:x} Requested ID: 0x{1:x}", incomingUBX->payload[0], incomingUBX->payload[1]);
+					p_dbg_logger->debug("processUBX: NACK received: Requested Class: 0x{0:x} Requested ID: 0x{1:x}", incomingUBX->payload[0], incomingUBX->payload[1]);
 					//_debugSerial->print(F("processUBX: NACK received: Requested Class: 0x"));
 					//_debugSerial->print(incomingUBX->payload[0], HEX);
 					//_debugSerial->print(F(" Requested ID: 0x"));
@@ -1192,7 +1205,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 				// Let's say so and leave incomingUBX->classAndIDmatch _unchanged_
 				if (_printDebug == true)
 				{
-					spdlog::debug("processUBX: incoming \"automatic\" message: Class: 0x{0:x} ID: 0x{1:x}", incomingUBX->cls, incomingUBX->id);
+					p_dbg_logger->debug("processUBX: incoming \"automatic\" message: Class: 0x{0:x} ID: 0x{1:x}", incomingUBX->cls, incomingUBX->id);
 					//_debugSerial->print(F("processUBX: incoming \"automatic\" message: Class: 0x"));
 					//_debugSerial->print(incomingUBX->cls, HEX);
 					//_debugSerial->print(F(" ID: 0x"));
@@ -1202,7 +1215,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 
 			if (_printDebug == true)
 			{
-				spdlog::debug("Incoming: Size: {} Received: ",incomingUBX->len);
+				p_dbg_logger->debug("Incoming: Size: {} Received: ",incomingUBX->len);
 				//_debugSerial->print(F("Incoming: Size: "));
 				//_debugSerial->print(incomingUBX->len);
 				//_debugSerial->print(F(" Received: "));
@@ -1210,19 +1223,19 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 
 				if (incomingUBX->valid == SFE_UBLOX_PACKET_VALIDITY_VALID)
 				{
-					spdlog::debug("packetCfg now valid");
+					p_dbg_logger->debug("packetCfg now valid");
 				}
 				if (packetAck.valid == SFE_UBLOX_PACKET_VALIDITY_VALID)
 				{
-					spdlog::debug("packetAck now valid");
+					p_dbg_logger->debug("packetAck now valid");
 				}
 				if (incomingUBX->classAndIDmatch == SFE_UBLOX_PACKET_VALIDITY_VALID)
 				{
-					spdlog::debug("packetCfg classAndIDmatch");
+					p_dbg_logger->debug("packetCfg classAndIDmatch");
 				}
 				if (packetAck.classAndIDmatch == SFE_UBLOX_PACKET_VALIDITY_VALID)
 				{
-					spdlog::debug("packetAck classAndIDmatch");
+					p_dbg_logger->debug("packetAck classAndIDmatch");
 				}
 			}
 
@@ -1260,7 +1273,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 					digitalWrite((uint8_t)debugPin, HIGH);
 				}
 
-				spdlog::debug("Checksum failed: checksumA {} checksumB {}; rollingChecksumA {} rollingChecksumB",incomingUBX->checksumA, incomingUBX->checksumB, rollingChecksumA, rollingChecksumB);
+				p_dbg_logger->debug("Checksum failed: checksumA {} checksumB {}; rollingChecksumA {} rollingChecksumB",incomingUBX->checksumA, incomingUBX->checksumB, rollingChecksumA, rollingChecksumB);
 				/*EWING dep_debugSerial->print(F("Checksum failed:"));
 				_debugSerial->print(F(" checksumA: "));
 				_debugSerial->print(incomingUBX->checksumA);
@@ -1317,11 +1330,11 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
 			if (overrun)
-				spdlog::debug("processUBX: buffer overrun detected!");
+				p_dbg_logger->debug("processUBX: buffer overrun detected!");
 			else
-				spdlog::debug("processUBX: counter hit maximum_payload_size + 6!");
+				p_dbg_logger->debug("processUBX: counter hit maximum_payload_size + 6!");
 				
-			spdlog::debug("activePacketBuffer {} maximum_payload_size {}", activePacketBuffer, maximum_payload_size);
+			p_dbg_logger->debug("activePacketBuffer {} maximum_payload_size {}", activePacketBuffer, maximum_payload_size);
 		}
 	}
 
@@ -2270,7 +2283,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendCommand(ubxPacket *outgoingUBX, uint16_t 
 
 	if (_printDebug == true)
 	{
-		spdlog::debug("Sending: ");
+		p_dbg_logger->debug("Sending: ");
 		printPacket(outgoingUBX, true); // Always print payload
 	}
 
@@ -2281,7 +2294,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendCommand(ubxPacket *outgoingUBX, uint16_t 
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("Send I2C Command failed");
+				p_dbg_logger->debug("Send I2C Command failed");
 			}
 			return retVal;
 		}
@@ -2298,7 +2311,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendCommand(ubxPacket *outgoingUBX, uint16_t 
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("sendCommand: Waiting for ACK response");
+				p_dbg_logger->debug("sendCommand: Waiting for ACK response");
 			}
 			retVal = waitForACKResponse(outgoingUBX, outgoingUBX->cls, outgoingUBX->id, maxWait); //Wait for Ack response
 		}
@@ -2306,7 +2319,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::sendCommand(ubxPacket *outgoingUBX, uint16_t 
 		{
 			if (_printDebug == true)
 			{
-				spdlog::debug("sendCommand: Waiting for No ACK response");
+				p_dbg_logger->debug("sendCommand: Waiting for No ACK response");
 			}
 			retVal = waitForNoACKResponse(outgoingUBX, outgoingUBX->cls, outgoingUBX->id, maxWait); //Wait for Ack response
 		}
@@ -2421,38 +2434,38 @@ void SFE_UBLOX_GNSS::printPacket(ubxPacket *packet, bool alwaysPrintPayload)
 {
 	if (_printDebug == true)
 	{
-		spdlog::debug("CLS:");
+		p_dbg_logger->debug("CLS:");
 		//_debugSerial->print(F("CLS:"));
 		if (packet->cls == UBX_CLASS_NAV) //1
-			spdlog::debug("NAV");//_debugSerial->print(F("NAV"));
+			p_dbg_logger->debug("NAV");//_debugSerial->print(F("NAV"));
 		else if (packet->cls == UBX_CLASS_ACK) //5
-			spdlog::debug("ACK");//_debugSerial->print(F("ACK"));
+			p_dbg_logger->debug("ACK");//_debugSerial->print(F("ACK"));
 		else if (packet->cls == UBX_CLASS_CFG) //6
-			spdlog::debug("CFG");//_debugSerial->print(F("CFG"));
+			p_dbg_logger->debug("CFG");//_debugSerial->print(F("CFG"));
 		else if (packet->cls == UBX_CLASS_MON) //0x0A
-			spdlog::debug("MON");//_debugSerial->print(F("MON"));
+			p_dbg_logger->debug("MON");//_debugSerial->print(F("MON"));
 		else
 		{
-			spdlog::debug("0x{0:x}",packet->cls);
+			p_dbg_logger->debug("0x{0:x}",packet->cls);
 			//_debugSerial->print(F("0x"));
 			//_debugSerial->print(packet->cls, HEX);
 		}
 
-		spdlog::debug(" ID: ");	//_debugSerial->print(F(" ID:"));
+		p_dbg_logger->debug(" ID: ");	//_debugSerial->print(F(" ID:"));
 		if (packet->cls == UBX_CLASS_NAV && packet->id == UBX_NAV_PVT)
-			spdlog::debug("PVT");//_debugSerial->print(F("PVT"));
+			p_dbg_logger->debug("PVT");//_debugSerial->print(F("PVT"));
 		else if (packet->cls == UBX_CLASS_CFG && packet->id == UBX_CFG_RATE)
-			spdlog::debug("RATE");//_debugSerial->print(F("RATE"));
+			p_dbg_logger->debug("RATE");//_debugSerial->print(F("RATE"));
 		else if (packet->cls == UBX_CLASS_CFG && packet->id == UBX_CFG_CFG)
-			spdlog::debug("SAVE");//_debugSerial->print(F("SAVE"));
+			p_dbg_logger->debug("SAVE");//_debugSerial->print(F("SAVE"));
 		else
 		{
-			spdlog::debug("0x{0:x}",packet->id);
+			p_dbg_logger->debug("0x{0:x}",packet->id);
 			//_debugSerial->print(F("0x"));
 			//_debugSerial->print(packet->id, HEX);
 		}
 
-		spdlog::debug(" Len: 0x{0:x}",packet->len);
+		p_dbg_logger->debug(" Len: 0x{0:x}",packet->len);
 		//_debugSerial->print(F(" Len: 0x"));
 		//_debugSerial->print(packet->len, HEX);
 
@@ -2460,21 +2473,21 @@ void SFE_UBLOX_GNSS::printPacket(ubxPacket *packet, bool alwaysPrintPayload)
 		// we could be printing gibberish from beyond the end of packetBuf
 		if ((alwaysPrintPayload == true) || (ignoreThisPayload == false))
 		{
-			spdlog::debug(" Payload: ");//_debugSerial->print(F(" Payload:"));
+			p_dbg_logger->debug(" Payload: ");//_debugSerial->print(F(" Payload:"));
 
 			for (int x = 0; x < packet->len; x++)
 			{
-				spdlog::debug(" {0:x}",packet->payload[x]);
+				p_dbg_logger->debug(" {0:x}",packet->payload[x]);
 				//_debugSerial->print(F(" "));
 				//_debugSerial->print(packet->payload[x], HEX);
 			}
 		}
 		else
 		{
-			spdlog::debug(" Payload: IGNORED");
+			p_dbg_logger->debug(" Payload: IGNORED");
 			//_debugSerial->print(F(" Payload: IGNORED"));
 		}
-		spdlog::debug("\n");
+		p_dbg_logger->debug("\n");
 		//_debugSerial->println();
 	}
 }
@@ -2535,7 +2548,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: valid data and valid ACK received after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: valid data and valid ACK received after {} msec", millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: valid data and valid ACK received after {} msec", millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_RECEIVED); //We received valid data and a correct ACK!
 			}
@@ -2551,7 +2564,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: no data and valid ACK after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: no data and valid ACK after {} msec", millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: no data and valid ACK after {} msec", millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_SENT); //We got an ACK but no data...
 			}
@@ -2569,7 +2582,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: data being OVERWRITTEN after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: data being OVERWRITTEN after {} msec",millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: data being OVERWRITTEN after {} msec",millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_OVERWRITTEN); // Data was valid but has been or is being overwritten
 			}
@@ -2582,7 +2595,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: CRC failed after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: CRC failed after {} msec", millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: CRC failed after {} msec", millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_CRC_FAIL); //Checksum fail
 			}
@@ -2600,7 +2613,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: data was NOTACKNOWLEDGED (NACK) after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: data was NOTACKNOWLEDGED (NACK) after {} msec",millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: data was NOTACKNOWLEDGED (NACK) after {} msec",millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_COMMAND_NACK); //We received a NACK!
 			}
@@ -2614,7 +2627,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: VALID data and INVALID ACK received after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: VALID data and INVALID ACK received after {} msec", millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: VALID data and INVALID ACK received after {} msec", millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_RECEIVED); //We received valid data and an invalid ACK!
 			}
@@ -2627,7 +2640,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: INVALID data and INVALID ACK received after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForACKResponse: INVALID data and INVALID ACK received after {} msec", millis() - startTime);
+					p_dbg_logger->debug("waitForACKResponse: INVALID data and INVALID ACK received after {} msec", millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_FAIL); //We received invalid data and an invalid ACK!
 			}
@@ -2640,7 +2653,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 				{
 					//_debugSerial->print(F("waitForACKResponse: valid data after "));
 					//_debugSerial->print(millis() - startTime);
-				   spdlog::debug("waitForACKResponse: valid data after {} msec. Waiting for ACK.",millis() - startTime);
+				   p_dbg_logger->debug("waitForACKResponse: valid data after {} msec. Waiting for ACK.",millis() - startTime);
 				}
 			}
 
@@ -2658,7 +2671,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 		{
 			//_debugSerial->print(F("waitForACKResponse: TIMEOUT with valid data after "));
 			//_debugSerial->print(millis() - startTime);
-			spdlog::debug("waitForACKResponse: TIMEOUT with valid data after {} msec.",millis() - startTime);
+			p_dbg_logger->debug("waitForACKResponse: TIMEOUT with valid data after {} msec.",millis() - startTime);
 		}
 		return (SFE_UBLOX_STATUS_DATA_RECEIVED); //We received valid data... But no ACK!
 	}
@@ -2667,7 +2680,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForACKResponse(ubxPacket *outgoingUBX, ui
 	{
 		//_debugSerial->print(F("waitForACKResponse: TIMEOUT after "));
 		//_debugSerial->print(millis() - startTime);
-		spdlog::debug("waitForACKResponse: TIMEOUT after {} msec.",millis() - startTime);
+		p_dbg_logger->debug("waitForACKResponse: TIMEOUT after {} msec.",millis() - startTime);
 	}
 
 	return (SFE_UBLOX_STATUS_TIMEOUT);
@@ -2705,7 +2718,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForNoACKResponse(ubxPacket *outgoingUBX, 
 				{
 					//_debugSerial->print(F("waitForNoACKResponse: valid data with CLS/ID match after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForNoACKResponse: valid data with CLS/ID match after {} msec",millis() - startTime);
+					p_dbg_logger->debug("waitForNoACKResponse: valid data with CLS/ID match after {} msec",millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_RECEIVED); //We received valid data!
 			}
@@ -2723,7 +2736,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForNoACKResponse(ubxPacket *outgoingUBX, 
 				{
 					//_debugSerial->print(F("waitForNoACKResponse: data being OVERWRITTEN after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForNoACKResponse: data being OVERWRITTEN after {} msec",millis() - startTime);
+					p_dbg_logger->debug("waitForNoACKResponse: data being OVERWRITTEN after {} msec",millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_DATA_OVERWRITTEN); // Data was valid but has been or is being overwritten
 			}
@@ -2750,7 +2763,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForNoACKResponse(ubxPacket *outgoingUBX, 
 				{
 					//_debugSerial->print(F("waitForNoACKResponse: CLS/ID match but failed CRC after "));
 					//_debugSerial->print(millis() - startTime);
-					spdlog::debug("waitForNoACKResponse: CLS/ID match but failed CRC after {} msec",millis() - startTime);
+					p_dbg_logger->debug("waitForNoACKResponse: CLS/ID match but failed CRC after {} msec",millis() - startTime);
 				}
 				return (SFE_UBLOX_STATUS_CRC_FAIL); //We received invalid data
 			}
@@ -2763,7 +2776,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::waitForNoACKResponse(ubxPacket *outgoingUBX, 
 	{
 		//_debugSerial->print(F("waitForNoACKResponse: TIMEOUT after "));
 		//_debugSerial->print(millis() - startTime);
-		spdlog::debug("waitForNoACKResponse: TIMEOUT after {} msec. No packet received.",millis() - startTime);
+		p_dbg_logger->debug("waitForNoACKResponse: TIMEOUT after {} msec. No packet received.",millis() - startTime);
 	}
 
 	return (SFE_UBLOX_STATUS_TIMEOUT);
@@ -2783,7 +2796,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVPOSECEF->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV POSECEF"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV POSECEF"));
 		packetUBXNAVPOSECEF->callbackPointer(*packetUBXNAVPOSECEF->callbackData); // Call the callback
 		packetUBXNAVPOSECEF->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2794,7 +2807,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVSTATUS->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV STATUS"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV STATUS"));
 		packetUBXNAVSTATUS->callbackPointer(*packetUBXNAVSTATUS->callbackData); // Call the callback
 		packetUBXNAVSTATUS->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2805,7 +2818,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVDOP->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV DOP"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV DOP"));
 		packetUBXNAVDOP->callbackPointer(*packetUBXNAVDOP->callbackData); // Call the callback
 		packetUBXNAVDOP->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2816,7 +2829,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVATT->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV ATT"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV ATT"));
 		packetUBXNAVATT->callbackPointer(*packetUBXNAVATT->callbackData); // Call the callback
 		packetUBXNAVATT->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2827,7 +2840,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVPVT->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		//if (_printDebug == true)
-		//  spdlog::debug("checkCallbacks: calling callback for NAV PVT"));
+		//  p_dbg_logger->debug("checkCallbacks: calling callback for NAV PVT"));
 		packetUBXNAVPVT->callbackPointer(*packetUBXNAVPVT->callbackData); // Call the callback
 		packetUBXNAVPVT->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2838,7 +2851,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVODO->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV ODO"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV ODO"));
 		packetUBXNAVODO->callbackPointer(*packetUBXNAVODO->callbackData); // Call the callback
 		packetUBXNAVODO->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2849,7 +2862,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVVELECEF->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV VELECEF"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV VELECEF"));
 		packetUBXNAVVELECEF->callbackPointer(*packetUBXNAVVELECEF->callbackData); // Call the callback
 		packetUBXNAVVELECEF->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2860,7 +2873,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVVELNED->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV VELNED"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV VELNED"));
 		packetUBXNAVVELNED->callbackPointer(*packetUBXNAVVELNED->callbackData); // Call the callback
 		packetUBXNAVVELNED->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2871,7 +2884,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVHPPOSECEF->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV HPPOSECEF"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV HPPOSECEF"));
 		packetUBXNAVHPPOSECEF->callbackPointer(*packetUBXNAVHPPOSECEF->callbackData); // Call the callback
 		packetUBXNAVHPPOSECEF->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2882,7 +2895,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVHPPOSLLH->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV HPPOSLLH"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV HPPOSLLH"));
 		packetUBXNAVHPPOSLLH->callbackPointer(*packetUBXNAVHPPOSLLH->callbackData); // Call the callback
 		packetUBXNAVHPPOSLLH->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2893,7 +2906,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVCLOCK->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV CLOCK"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV CLOCK"));
 		packetUBXNAVCLOCK->callbackPointer(*packetUBXNAVCLOCK->callbackData); // Call the callback
 		packetUBXNAVCLOCK->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2904,7 +2917,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXNAVRELPOSNED->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for NAV RELPOSNED"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for NAV RELPOSNED"));
 		packetUBXNAVRELPOSNED->callbackPointer(*packetUBXNAVRELPOSNED->callbackData); // Call the callback
 		packetUBXNAVRELPOSNED->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2915,7 +2928,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXRXMSFRBX->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for RXM SFRBX"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for RXM SFRBX"));
 		packetUBXRXMSFRBX->callbackPointer(*packetUBXRXMSFRBX->callbackData); // Call the callback
 		packetUBXRXMSFRBX->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2926,7 +2939,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXRXMRAWX->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for RXM RAWX"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for RXM RAWX"));
 		packetUBXRXMRAWX->callbackPointer(*packetUBXRXMRAWX->callbackData); // Call the callback
 		packetUBXRXMRAWX->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2937,7 +2950,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXTIMTM2->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for TIM TM2"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for TIM TM2"));
 		packetUBXTIMTM2->callbackPointer(*packetUBXTIMTM2->callbackData); // Call the callback
 		packetUBXTIMTM2->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2948,7 +2961,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXESFALG->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for ESF ALG"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for ESF ALG"));
 		packetUBXESFALG->callbackPointer(*packetUBXESFALG->callbackData); // Call the callback
 		packetUBXESFALG->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2959,7 +2972,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXESFINS->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for ESF INS"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for ESF INS"));
 		packetUBXESFINS->callbackPointer(*packetUBXESFINS->callbackData); // Call the callback
 		packetUBXESFINS->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2970,7 +2983,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXESFMEAS->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for ESF MEAS"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for ESF MEAS"));
 		packetUBXESFMEAS->callbackPointer(*packetUBXESFMEAS->callbackData); // Call the callback
 		packetUBXESFMEAS->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2981,7 +2994,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXESFRAW->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for ESF RAW"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for ESF RAW"));
 		packetUBXESFRAW->callbackPointer(*packetUBXESFRAW->callbackData); // Call the callback
 		packetUBXESFRAW->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -2992,7 +3005,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXESFSTATUS->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for ESF STATUS"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for ESF STATUS"));
 		packetUBXESFSTATUS->callbackPointer(*packetUBXESFSTATUS->callbackData); // Call the callback
 		packetUBXESFSTATUS->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -3003,7 +3016,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXHNRATT->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for HNR ATT"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for HNR ATT"));
 		packetUBXHNRATT->callbackPointer(*packetUBXHNRATT->callbackData); // Call the callback
 		packetUBXHNRATT->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -3014,7 +3027,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXHNRINS->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for HNR INS"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for HNR INS"));
 		packetUBXHNRINS->callbackPointer(*packetUBXHNRINS->callbackData); // Call the callback
 		packetUBXHNRINS->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -3025,7 +3038,7 @@ void SFE_UBLOX_GNSS::checkCallbacks(void)
 		&& (packetUBXHNRPVT->automaticFlags.flags.bits.callbackCopyValid == true)) // If the copy of the data is valid
 	{
 		// if (_printDebug == true)
-		//   spdlog::debug("checkCallbacks: calling callback for HNR PVT"));
+		//   p_dbg_logger->debug("checkCallbacks: calling callback for HNR PVT"));
 		packetUBXHNRPVT->callbackPointer(*packetUBXHNRPVT->callbackData); // Call the callback
 		packetUBXHNRPVT->automaticFlags.flags.bits.callbackCopyValid = false; // Mark the data as stale
 	}
@@ -3142,7 +3155,7 @@ bool SFE_UBLOX_GNSS::createFileBuffer(void)
 	{
 		if (_printDebug == true)
 		{
-			spdlog::debug("createFileBuffer: Warning. FileBufferSize is zero. Data logging is not possible.");
+			p_dbg_logger->debug("createFileBuffer: Warning. FileBufferSize is zero. Data logging is not possible.");
 		}
 		return(false);
 	}
@@ -3153,7 +3166,7 @@ bool SFE_UBLOX_GNSS::createFileBuffer(void)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
-			spdlog::debug("createFileBuffer: RAM alloc failed!");
+			p_dbg_logger->debug("createFileBuffer: RAM alloc failed!");
 		}
 		return(false);
 	}
@@ -3193,7 +3206,7 @@ bool SFE_UBLOX_GNSS::storePacket(ubxPacket *msg)
 	{
 		if (_printDebug == true)
 		{
-			spdlog::debug("storePacket: file buffer not available!");
+			p_dbg_logger->debug("storePacket: file buffer not available!");
 		}
 		return(false);
 	}
@@ -3204,7 +3217,7 @@ bool SFE_UBLOX_GNSS::storePacket(ubxPacket *msg)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
-			spdlog::debug("storePacket: insufficient space available! Data will be lost!");
+			p_dbg_logger->debug("storePacket: insufficient space available! Data will be lost!");
 		}
 		return(false);
 	}
@@ -3241,7 +3254,7 @@ bool SFE_UBLOX_GNSS::storeFileBytes(uint8_t *theBytes, uint16_t numBytes)
 	{
 		if (_printDebug == true)
 		{
-			spdlog::debug("storeFileBytes: file buffer not available!");
+			p_dbg_logger->debug("storeFileBytes: file buffer not available!");
 		}
 		return(false);
 	}
@@ -3251,7 +3264,7 @@ bool SFE_UBLOX_GNSS::storeFileBytes(uint8_t *theBytes, uint16_t numBytes)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
-			spdlog::debug("storeFileBytes: insufficient space available! Data will be lost!");
+			p_dbg_logger->debug("storeFileBytes: insufficient space available! Data will be lost!");
 		}
 		return(false);
 	}
@@ -3387,7 +3400,7 @@ void SFE_UBLOX_GNSS::setSerialRate(uint32_t baudrate, uint8_t uartPort, uint16_t
 	{
 		//_debugSerial->print(F("Current baud rate: "));
 		//_debugSerial->println(((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
-		spdlog::debug("Current baud rate: {}",((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
+		p_dbg_logger->debug("Current baud rate: {}",((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
 	}
 
 	packetCfg.cls = UBX_CLASS_CFG;
@@ -3405,7 +3418,7 @@ void SFE_UBLOX_GNSS::setSerialRate(uint32_t baudrate, uint8_t uartPort, uint16_t
 	{
 		//_debugSerial->print(F("New baud rate:"));
 		//_debugSerial->println(((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
-		spdlog::debug("New baud rate: {}",((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
+		p_dbg_logger->debug("New baud rate: {}",((uint32_t)payloadCfg[10] << 16) | ((uint32_t)payloadCfg[9] << 8) | payloadCfg[8]);
 	}
 
 	sfe_ublox_status_e retVal = sendCommand(&packetCfg, maxWait);
@@ -3413,7 +3426,7 @@ void SFE_UBLOX_GNSS::setSerialRate(uint32_t baudrate, uint8_t uartPort, uint16_t
 	{
 		//_debugSerial->print(F("setSerialRate: sendCommand returned: "));
 		//_debugSerial->println(statusString(retVal));
-		spdlog::debug("setSerialRate: sendCommand returned: "+std::string(statusString(retVal)) );
+		p_dbg_logger->debug("setSerialRate: sendCommand returned: "+std::string(statusString(retVal)) );
 	}
 }
 
@@ -3797,7 +3810,7 @@ bool SFE_UBLOX_GNSS::getProtocolVersion(uint16_t maxWait)
 				//_debugSerial->print(moduleSWVersion->versionHigh);
 				//_debugSerial->print(F("."));
 				//_debugSerial->println(moduleSWVersion->versionLow);
-				spdlog::debug("Protocol version: {}.{} ",moduleSWVersion->versionHigh,moduleSWVersion->versionLow);
+				p_dbg_logger->debug("Protocol version: {}.{} ",moduleSWVersion->versionHigh,moduleSWVersion->versionLow);
 			}
 			return (true); //Success!
 		}
@@ -3813,7 +3826,7 @@ bool SFE_UBLOX_GNSS::initModuleSWVersion()
 	if (moduleSWVersion == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initModuleSWVersion: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initModuleSWVersion: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	moduleSWVersion->versionHigh = 0;
@@ -3998,7 +4011,7 @@ bool SFE_UBLOX_GNSS::initGeofenceParams()
 	if (currentGeofenceParams == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initGeofenceParams: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initGeofenceParams: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	currentGeofenceParams->numFences = 0;
@@ -4022,7 +4035,7 @@ bool SFE_UBLOX_GNSS::powerSaveMode(bool power_save, uint16_t maxWait)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
-			spdlog::debug("powerSaveMode (UBX-CFG-RXM) is not supported by this protocol version");
+			p_dbg_logger->debug("powerSaveMode (UBX-CFG-RXM) is not supported by this protocol version");
 		}
 		return (false);
 	}
@@ -4070,7 +4083,7 @@ uint8_t SFE_UBLOX_GNSS::getPowerSaveMode(uint16_t maxWait)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
 		{
-			spdlog::debug("powerSaveMode (UBX-CFG-RXM) is not supported by this protocol version");
+			p_dbg_logger->debug("powerSaveMode (UBX-CFG-RXM) is not supported by this protocol version");
 		}
 		return (255);
 	}
@@ -4100,7 +4113,7 @@ bool SFE_UBLOX_GNSS::powerOff(uint32_t durationInMs, uint16_t maxWait)
 		//_debugSerial->print(F("Powering off for "));
 		//_debugSerial->print(durationInMs);
 		//_debugSerial->println(" ms");
-		spdlog::debug("Powering off for  {} ms",durationInMs);
+		p_dbg_logger->debug("Powering off for  {} ms",durationInMs);
 	}
 
 	// Power off device using UBX-RXM-PMREQ
@@ -4147,7 +4160,7 @@ bool SFE_UBLOX_GNSS::powerOffWithInterrupt(uint32_t durationInMs, uint32_t wakeu
 		//_debugSerial->print(F("Powering off for "));
 		//_debugSerial->print(durationInMs);
 		//_debugSerial->println(" ms");
-		spdlog::debug("Powering off for {} ms",durationInMs);
+		p_dbg_logger->debug("Powering off for {} ms",durationInMs);
 	}
 
 	// Power off device using UBX-RXM-PMREQ
@@ -4464,7 +4477,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::getVal(uint32_t key, uint8_t layer, uint16_t 
 		//_debugSerial->print(F("key: 0x"));
 		//_debugSerial->print(key, HEX);
 		//_debugSerial->println();
-		spdlog::debug("key: 0x{:x}",key);
+		p_dbg_logger->debug("key: 0x{:x}",key);
 	}
 
 	//Send VALGET command with this key
@@ -4474,7 +4487,7 @@ sfe_ublox_status_e SFE_UBLOX_GNSS::getVal(uint32_t key, uint8_t layer, uint16_t 
 	{
 		//_debugSerial->print(F("getVal: sendCommand returned: "));
 		//_debugSerial->println(statusString(retVal));
-		spdlog::debug("getVal: sendCommand returned: "+std::string(statusString(retVal)));
+		p_dbg_logger->debug("getVal: sendCommand returned: "+std::string(statusString(retVal)));
 	}
 
 	//Verify the response is the correct length as compared to what the user called (did the module respond with 8-bits but the user called getVal32?)
@@ -4919,7 +4932,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVPOSECEFcallback(void (*callbackPointer)(UBX_NAV_P
 	if (packetUBXNAVPOSECEF->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVPOSECEFcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVPOSECEFcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -4951,7 +4964,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVPOSECEF()
 	if (packetUBXNAVPOSECEF == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVPOSECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVPOSECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVPOSECEF->automaticFlags.flags.all = 0;
@@ -5067,7 +5080,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVSTATUScallback(void (*callbackPointer)(UBX_NAV_ST
 	if (packetUBXNAVSTATUS->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVSTATUScallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVSTATUScallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5099,7 +5112,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVSTATUS()
 	if (packetUBXNAVSTATUS == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVSTATUS: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVSTATUS: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVSTATUS->automaticFlags.flags.all = 0;
@@ -5137,7 +5150,7 @@ bool SFE_UBLOX_GNSS::getDOP(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getDOP: Autoreporting"));
+		//   p_dbg_logger->debug("getDOP: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_NAV, UBX_NAV_DOP);
 		return packetUBXNAVDOP->moduleQueried.moduleQueried.bits.all;
@@ -5147,7 +5160,7 @@ bool SFE_UBLOX_GNSS::getDOP(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getDOP: Exit immediately"));
+		//   p_dbg_logger->debug("getDOP: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -5155,7 +5168,7 @@ bool SFE_UBLOX_GNSS::getDOP(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getDOP: Polling"));
+		//   p_dbg_logger->debug("getDOP: Polling"));
 		// }
 
 		//The GPS is not automatically reporting navigation position so we have to poll explicitly
@@ -5174,7 +5187,7 @@ bool SFE_UBLOX_GNSS::getDOP(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getDOP: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getDOP: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -5237,7 +5250,7 @@ bool SFE_UBLOX_GNSS::setAutoDOPcallback(void (*callbackPointer)(UBX_NAV_DOP_data
 	if (packetUBXNAVDOP->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoDOPcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoDOPcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5269,7 +5282,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVDOP()
 	if (packetUBXNAVDOP == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVDOP: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVDOP: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVDOP->automaticFlags.flags.all = 0;
@@ -5391,7 +5404,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVATTcallback(void (*callbackPointer)(UBX_NAV_ATT_d
 	if (packetUBXNAVATT->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVATTcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVATTcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5423,7 +5436,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVATT()
 	if (packetUBXNAVATT == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVATT: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVATT: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVATT->automaticFlags.flags.all = 0;
@@ -5461,7 +5474,7 @@ bool SFE_UBLOX_GNSS::getPVT(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getPVT: Autoreporting"));
+		//   p_dbg_logger->debug("getPVT: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_NAV, UBX_NAV_PVT);
 		return packetUBXNAVPVT->moduleQueried.moduleQueried1.bits.all;
@@ -5471,7 +5484,7 @@ bool SFE_UBLOX_GNSS::getPVT(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getPVT: Exit immediately"));
+		//   p_dbg_logger->debug("getPVT: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -5479,7 +5492,7 @@ bool SFE_UBLOX_GNSS::getPVT(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getPVT: Polling"));
+		//   p_dbg_logger->debug("getPVT: Polling"));
 		// }
 
 		//The GPS is not automatically reporting navigation position so we have to poll explicitly
@@ -5499,7 +5512,7 @@ bool SFE_UBLOX_GNSS::getPVT(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getPVT: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getPVT: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -5562,7 +5575,7 @@ bool SFE_UBLOX_GNSS::setAutoPVTcallback(void (*callbackPointer)(UBX_NAV_PVT_data
 	if (packetUBXNAVPVT->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoPVTcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoPVTcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5595,7 +5608,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVPVT()
 	if (packetUBXNAVPVT == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVPVT: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVPVT: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVPVT->automaticFlags.flags.all = 0;
@@ -5712,7 +5725,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVODOcallback(void (*callbackPointer)(UBX_NAV_ODO_d
 	if (packetUBXNAVODO->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVODOcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVODOcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5744,7 +5757,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVODO()
 	if (packetUBXNAVODO == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVODO: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVODO: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVODO->automaticFlags.flags.all = 0;
@@ -5859,7 +5872,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVVELECEFcallback(void (*callbackPointer)(UBX_NAV_V
 	if (packetUBXNAVVELECEF->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVVELECEFcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVVELECEFcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -5891,7 +5904,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVVELECEF()
 	if (packetUBXNAVVELECEF == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVVELECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVVELECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVVELECEF->automaticFlags.flags.all = 0;
@@ -6006,7 +6019,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVVELNEDcallback(void (*callbackPointer)(UBX_NAV_VE
 	if (packetUBXNAVVELNED->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVVELNEDcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVVELNEDcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6038,7 +6051,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVVELNED()
 	if (packetUBXNAVVELNED == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVVELNED: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVVELNED: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVVELNED->automaticFlags.flags.all = 0;
@@ -6153,7 +6166,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVHPPOSECEFcallback(void (*callbackPointer)(UBX_NAV
 	if (packetUBXNAVHPPOSECEF->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVHPPOSECEFcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVHPPOSECEFcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6185,7 +6198,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVHPPOSECEF()
 	if (packetUBXNAVHPPOSECEF == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVHPPOSECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVHPPOSECEF: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVHPPOSECEF->automaticFlags.flags.all = 0;
@@ -6222,7 +6235,7 @@ bool SFE_UBLOX_GNSS::getHPPOSLLH(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHPPOSLLH: Autoreporting"));
+		//   p_dbg_logger->debug("getHPPOSLLH: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_NAV, UBX_NAV_HPPOSLLH);
 		return packetUBXNAVHPPOSLLH->moduleQueried.moduleQueried.bits.all;
@@ -6232,7 +6245,7 @@ bool SFE_UBLOX_GNSS::getHPPOSLLH(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHPPOSLLH: Exit immediately"));
+		//   p_dbg_logger->debug("getHPPOSLLH: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -6240,7 +6253,7 @@ bool SFE_UBLOX_GNSS::getHPPOSLLH(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHPPOSLLH: Polling"));
+		//   p_dbg_logger->debug("getHPPOSLLH: Polling"));
 		// }
 
 		//The GPS is not automatically reporting navigation position so we have to poll explicitly
@@ -6259,7 +6272,7 @@ bool SFE_UBLOX_GNSS::getHPPOSLLH(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getHPPOSLLH: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getHPPOSLLH: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -6322,7 +6335,7 @@ bool SFE_UBLOX_GNSS::setAutoHPPOSLLHcallback(void (*callbackPointer)(UBX_NAV_HPP
 	if (packetUBXNAVHPPOSLLH->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoHPPOSLLHcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoHPPOSLLHcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6354,7 +6367,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVHPPOSLLH()
 	if (packetUBXNAVHPPOSLLH == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVHPPOSLLH: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVHPPOSLLH: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVHPPOSLLH->automaticFlags.flags.all = 0;
@@ -6469,7 +6482,7 @@ bool SFE_UBLOX_GNSS::setAutoNAVCLOCKcallback(void (*callbackPointer)(UBX_NAV_CLO
 	if (packetUBXNAVCLOCK->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoNAVCLOCKcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoNAVCLOCKcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6501,7 +6514,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVCLOCK()
 	if (packetUBXNAVCLOCK == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVCLOCK: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVCLOCK: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVCLOCK->automaticFlags.flags.all = 0;
@@ -6562,7 +6575,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVSVIN()
 	if (packetUBXNAVSVIN == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVSVIN: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVSVIN: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVSVIN->automaticFlags.flags.all = 0;
@@ -6668,7 +6681,7 @@ bool SFE_UBLOX_GNSS::setAutoRELPOSNEDcallback(void (*callbackPointer)(UBX_NAV_RE
 	if (packetUBXNAVRELPOSNED->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoRELPOSNEDcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoRELPOSNEDcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6700,7 +6713,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXNAVRELPOSNED()
 	if (packetUBXNAVRELPOSNED == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXNAVRELPOSNED: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXNAVRELPOSNED: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXNAVRELPOSNED->automaticFlags.flags.all = 0;
@@ -6815,7 +6828,7 @@ bool SFE_UBLOX_GNSS::setAutoRXMSFRBXcallback(void (*callbackPointer)(UBX_RXM_SFR
 	if (packetUBXRXMSFRBX->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoRXMSFRBXcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoRXMSFRBXcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6847,7 +6860,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXRXMSFRBX()
 	if (packetUBXRXMSFRBX == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXRXMSFRBX: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXRXMSFRBX: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXRXMSFRBX->automaticFlags.flags.all = 0;
@@ -6962,7 +6975,7 @@ bool SFE_UBLOX_GNSS::setAutoRXMRAWXcallback(void (*callbackPointer)(UBX_RXM_RAWX
 	if (packetUBXRXMRAWX->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoRXMRAWXcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoRXMRAWXcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -6994,7 +7007,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXRXMRAWX()
 	if (packetUBXRXMRAWX == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXRXMRAWX: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXRXMRAWX: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXRXMRAWX->automaticFlags.flags.all = 0;
@@ -7068,7 +7081,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXCFGRATE()
 	if (packetUBXCFGRATE == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXCFGRATE: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXCFGRATE: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXCFGRATE->automaticFlags.flags.all = 0;
@@ -7169,7 +7182,7 @@ bool SFE_UBLOX_GNSS::setAutoTIMTM2callback(void (*callbackPointer)(UBX_TIM_TM2_d
 	if (packetUBXTIMTM2->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoTIMTM2callback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoTIMTM2callback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -7201,7 +7214,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXTIMTM2()
 	if (packetUBXTIMTM2 == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXTIMTM2: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXTIMTM2: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXTIMTM2->automaticFlags.flags.all = 0;
@@ -7243,7 +7256,7 @@ bool SFE_UBLOX_GNSS::getESFALG(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfAlignment: Autoreporting"));
+		//   p_dbg_logger->debug("getEsfAlignment: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_ESF, UBX_ESF_ALG);
 		return packetUBXESFALG->moduleQueried.moduleQueried.bits.all;
@@ -7253,7 +7266,7 @@ bool SFE_UBLOX_GNSS::getESFALG(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfAlignment: Exit immediately"));
+		//   p_dbg_logger->debug("getEsfAlignment: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -7261,7 +7274,7 @@ bool SFE_UBLOX_GNSS::getESFALG(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfAlignment: Polling"));
+		//   p_dbg_logger->debug("getEsfAlignment: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -7280,7 +7293,7 @@ bool SFE_UBLOX_GNSS::getESFALG(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getEsfAlignment: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getEsfAlignment: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -7345,7 +7358,7 @@ bool SFE_UBLOX_GNSS::setAutoESFALGcallback(void (*callbackPointer)(UBX_ESF_ALG_d
 	if (packetUBXESFALG->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoESFALGcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoESFALGcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -7377,7 +7390,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXESFALG()
 	if (packetUBXESFALG == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXESFALG: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXESFALG: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXESFALG->automaticFlags.flags.all = 0;
@@ -7419,7 +7432,7 @@ bool SFE_UBLOX_GNSS::getESFSTATUS(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfInfo: Autoreporting"));
+		//   p_dbg_logger->debug("getEsfInfo: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_ESF, UBX_ESF_STATUS);
 		return packetUBXESFSTATUS->moduleQueried.moduleQueried.bits.all;
@@ -7429,7 +7442,7 @@ bool SFE_UBLOX_GNSS::getESFSTATUS(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfInfo: Exit immediately"));
+		//   p_dbg_logger->debug("getEsfInfo: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -7437,7 +7450,7 @@ bool SFE_UBLOX_GNSS::getESFSTATUS(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfInfo: Polling"));
+		//   p_dbg_logger->debug("getEsfInfo: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -7456,7 +7469,7 @@ bool SFE_UBLOX_GNSS::getESFSTATUS(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getEsfInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getEsfInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -7521,7 +7534,7 @@ bool SFE_UBLOX_GNSS::setAutoESFSTATUScallback(void (*callbackPointer)(UBX_ESF_ST
 	if (packetUBXESFSTATUS->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoESFSTATUScallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoESFSTATUScallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -7554,7 +7567,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXESFSTATUS()
 	if (packetUBXESFSTATUS == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXESFSTATUS: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXESFSTATUS: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXESFSTATUS->automaticFlags.flags.all = 0;
@@ -7596,7 +7609,7 @@ bool SFE_UBLOX_GNSS::getESFINS(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfIns: Autoreporting"));
+		//   p_dbg_logger->debug("getEsfIns: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_ESF, UBX_ESF_INS);
 		return packetUBXESFINS->moduleQueried.moduleQueried.bits.all;
@@ -7606,7 +7619,7 @@ bool SFE_UBLOX_GNSS::getESFINS(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfIns: Exit immediately"));
+		//   p_dbg_logger->debug("getEsfIns: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -7614,7 +7627,7 @@ bool SFE_UBLOX_GNSS::getESFINS(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfIns: Polling"));
+		//   p_dbg_logger->debug("getEsfIns: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -7633,7 +7646,7 @@ bool SFE_UBLOX_GNSS::getESFINS(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getEsfIns: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getEsfIns: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -7698,7 +7711,7 @@ bool SFE_UBLOX_GNSS::setAutoESFINScallback(void (*callbackPointer)(UBX_ESF_INS_d
 	if (packetUBXESFINS->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoESFINScallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoESFINScallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -7730,7 +7743,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXESFINS()
 	if (packetUBXESFINS == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXESFINS: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXESFINS: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXESFINS->automaticFlags.flags.all = 0;
@@ -7772,7 +7785,7 @@ bool SFE_UBLOX_GNSS::getESFMEAS(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfDataInfo: Autoreporting"));
+		//   p_dbg_logger->debug("getEsfDataInfo: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_ESF, UBX_ESF_MEAS);
 		return packetUBXESFMEAS->moduleQueried.moduleQueried.bits.all;
@@ -7782,7 +7795,7 @@ bool SFE_UBLOX_GNSS::getESFMEAS(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfDataInfo: Exit immediately"));
+		//   p_dbg_logger->debug("getEsfDataInfo: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -7790,7 +7803,7 @@ bool SFE_UBLOX_GNSS::getESFMEAS(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfDataInfo: Polling"));
+		//   p_dbg_logger->debug("getEsfDataInfo: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -7809,7 +7822,7 @@ bool SFE_UBLOX_GNSS::getESFMEAS(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getEsfDataInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getEsfDataInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -7874,7 +7887,7 @@ bool SFE_UBLOX_GNSS::setAutoESFMEAScallback(void (*callbackPointer)(UBX_ESF_MEAS
 	if (packetUBXESFMEAS->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoESFMEAScallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoESFMEAScallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -7906,7 +7919,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXESFMEAS()
 	if (packetUBXESFMEAS == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXESFMEAS: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXESFMEAS: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXESFMEAS->automaticFlags.flags.all = 0;
@@ -7948,7 +7961,7 @@ bool SFE_UBLOX_GNSS::getESFRAW(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfRawDataInfo: Autoreporting"));
+		//   p_dbg_logger->debug("getEsfRawDataInfo: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_ESF, UBX_ESF_RAW);
 		return packetUBXESFRAW->moduleQueried.moduleQueried.bits.all;
@@ -7958,7 +7971,7 @@ bool SFE_UBLOX_GNSS::getESFRAW(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfRawDataInfo: Exit immediately"));
+		//   p_dbg_logger->debug("getEsfRawDataInfo: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -7966,7 +7979,7 @@ bool SFE_UBLOX_GNSS::getESFRAW(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getEsfRawDataInfo: Polling"));
+		//   p_dbg_logger->debug("getEsfRawDataInfo: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -7985,7 +7998,7 @@ bool SFE_UBLOX_GNSS::getESFRAW(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getEsfRawDataInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getEsfRawDataInfo: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -8050,7 +8063,7 @@ bool SFE_UBLOX_GNSS::setAutoESFRAWcallback(void (*callbackPointer)(UBX_ESF_RAW_d
 	if (packetUBXESFRAW->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoESFRAWcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoESFRAWcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -8082,7 +8095,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXESFRAW()
 	if (packetUBXESFRAW == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXESFRAW: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXESFRAW: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXESFRAW->automaticFlags.flags.all = 0;
@@ -8129,7 +8142,7 @@ bool SFE_UBLOX_GNSS::getHNRATT(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRAtt: Autoreporting"));
+		//   p_dbg_logger->debug("getHNRAtt: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_HNR, UBX_HNR_ATT);
 		return packetUBXHNRATT->moduleQueried.moduleQueried.bits.all;
@@ -8139,7 +8152,7 @@ bool SFE_UBLOX_GNSS::getHNRATT(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRAtt: Exit immediately"));
+		//   p_dbg_logger->debug("getHNRAtt: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -8147,7 +8160,7 @@ bool SFE_UBLOX_GNSS::getHNRATT(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRAtt: Polling"));
+		//   p_dbg_logger->debug("getHNRAtt: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR attitude so we have to poll explicitly
@@ -8166,7 +8179,7 @@ bool SFE_UBLOX_GNSS::getHNRATT(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getHNRAtt: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getHNRAtt: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -8231,7 +8244,7 @@ bool SFE_UBLOX_GNSS::setAutoHNRATTcallback(void (*callbackPointer)(UBX_HNR_ATT_d
 	if (packetUBXHNRATT->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoHNRAttcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoHNRAttcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -8263,7 +8276,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXHNRATT()
 	if (packetUBXHNRATT == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXHNRATT: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXHNRATT: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXHNRATT->automaticFlags.flags.all = 0;
@@ -8311,7 +8324,7 @@ bool SFE_UBLOX_GNSS::getHNRINS(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRDyn: Autoreporting"));
+		//   p_dbg_logger->debug("getHNRDyn: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_HNR, UBX_HNR_INS);
 		return packetUBXHNRINS->moduleQueried.moduleQueried.bits.all;
@@ -8321,7 +8334,7 @@ bool SFE_UBLOX_GNSS::getHNRINS(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRDyn: Exit immediately"));
+		//   p_dbg_logger->debug("getHNRDyn: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -8329,7 +8342,7 @@ bool SFE_UBLOX_GNSS::getHNRINS(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRDyn: Polling"));
+		//   p_dbg_logger->debug("getHNRDyn: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR vehicle dynamics so we have to poll explicitly
@@ -8348,7 +8361,7 @@ bool SFE_UBLOX_GNSS::getHNRINS(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getHNRDyn: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getHNRDyn: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -8413,7 +8426,7 @@ bool SFE_UBLOX_GNSS::setAutoHNRINScallback(void (*callbackPointer)(UBX_HNR_INS_d
 	if (packetUBXHNRINS->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoHNRDyncallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoHNRDyncallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -8445,7 +8458,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXHNRINS()
 	if (packetUBXHNRINS == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXHNRINS: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXHNRINS: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXHNRINS->automaticFlags.flags.all = 0;
@@ -8487,7 +8500,7 @@ bool SFE_UBLOX_GNSS::getHNRPVT(uint16_t maxWait)
 		//The GPS is automatically reporting, we just check whether we got unread data
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRPVT: Autoreporting"));
+		//   p_dbg_logger->debug("getHNRPVT: Autoreporting"));
 		// }
 		checkUbloxInternal(&packetCfg, UBX_CLASS_HNR, UBX_HNR_PVT);
 		return packetUBXHNRPVT->moduleQueried.moduleQueried.bits.all;
@@ -8497,7 +8510,7 @@ bool SFE_UBLOX_GNSS::getHNRPVT(uint16_t maxWait)
 		//Someone else has to call checkUblox for us...
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRPVT: Exit immediately"));
+		//   p_dbg_logger->debug("getHNRPVT: Exit immediately"));
 		// }
 		return (false);
 	}
@@ -8505,7 +8518,7 @@ bool SFE_UBLOX_GNSS::getHNRPVT(uint16_t maxWait)
 	{
 		// if (_printDebug == true)
 		// {
-		//   spdlog::debug("getHNRPVT: Polling"));
+		//   p_dbg_logger->debug("getHNRPVT: Polling"));
 		// }
 
 		//The GPS is not automatically reporting HNR PVT so we have to poll explicitly
@@ -8524,7 +8537,7 @@ bool SFE_UBLOX_GNSS::getHNRPVT(uint16_t maxWait)
 		{
 			// if (_printDebug == true)
 			// {
-			//   spdlog::debug("getHNRPVT: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
+			//   p_dbg_logger->debug("getHNRPVT: data in packetCfg was OVERWRITTEN by another message (but that's OK)"));
 			// }
 			return (true);
 		}
@@ -8589,7 +8602,7 @@ bool SFE_UBLOX_GNSS::setAutoHNRPVTcallback(void (*callbackPointer)(UBX_HNR_PVT_d
 	if (packetUBXHNRPVT->callbackData == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("setAutoHNRPVTcallback: PANIC! RAM allocation failed!");
+			p_dbg_logger->debug("setAutoHNRPVTcallback: PANIC! RAM allocation failed!");
 		return (false);
 	}
 
@@ -8621,7 +8634,7 @@ bool SFE_UBLOX_GNSS::initPacketUBXHNRPVT()
 	if (packetUBXHNRPVT == NULL)
 	{
 		if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-			spdlog::debug("initPacketUBXHNRPVT: PANIC! RAM allocation failed! This will end _very_ badly...");
+			p_dbg_logger->debug("initPacketUBXHNRPVT: PANIC! RAM allocation failed! This will end _very_ badly...");
 		return (false);
 	}
 	packetUBXHNRPVT->automaticFlags.flags.all = 0;
