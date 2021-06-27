@@ -28,6 +28,7 @@ public:
 private:
 	RaspiSenseConfig _config;
 	SFE_UBLOX_GNSS _m8n;
+	bool _initialized = false;
 
 	bool InitDirectory();
 	bool InitGnss();

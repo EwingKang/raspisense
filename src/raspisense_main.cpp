@@ -26,7 +26,12 @@ int main(int argc, char *argv[])
 	//sense_config.enable_gnss_csv = true; // Deubg
 	
 	RaspiSense sense;
-	sense.Init(sense_config);
+	if( !sense.Init(sense_config) )
+	{
+		std::cout << "RaspiSense init failed." << std::endl;
+		return -1;
+	}
+	
 	sense.Spin();
 	
 	return 0;

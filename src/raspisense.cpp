@@ -20,6 +20,8 @@ bool RaspiSense::Init(const RaspiSenseConfig & config)
 	if( !InitGnss() ) return false;
 	if( !ConfigGnss() ) return false;
 	if( !InitCamera() ) return false;
+	
+	_initialized = true;
 	return true;
 }
 
@@ -63,6 +65,12 @@ bool RaspiSense::InitDirectory()
 
 bool RaspiSense::Spin()
 {
+	if( !_initialized )
+	{
+		std::cout << "RaspiSense hasn't been initialized" << std::endl;
+		return false;
+	}
+	
 	// TODO: put GNSS and CAMERA on different thread since they're not related at all
 	
 	// Receiving PVT messages

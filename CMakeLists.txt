@@ -5,7 +5,7 @@ project (raspicam_test
 )
 set (CMAKE_CXX_STANDARD 17)
 
-# Required packages
+# ===== Required packages ===== 
 find_package(raspicam REQUIRED)
 message( "Raspcam lib: ${raspicam_INCLUDE_DIR}" )
 find_package(OpenCV REQUIRED)
@@ -14,33 +14,33 @@ message( "Open CV version: ${OpenCV_VERSION}" )
 find_library(wiringPi_LIB wiringPi)
 message( "Find WiringPI lib" )
 
-# External libs
+
+# ===== Build 3rd party libs =====
 add_subdirectory(lib/cxxopts)
 add_subdirectory(lib/spdlog)
-
 #cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
+
+# ===== Compile settings =====
 add_compile_options(-Wall -Wextra -pedantic)
 
-# library
+
+# ===== Costum libraries =====
 add_library(ublox_gnss_library
 	src/ublox_gnss_library.cpp)
 target_include_directories(ublox_gnss_library 
   PUBLIC
 	include/
 	lib/serial/include/
-  #PRIVATE
 )
 target_link_libraries(ublox_gnss_library
-    PRIVATE
+  PUBLIC
+	serial
+  PRIVATE
 	${wiringPi_LIB}
 	spdlog
-	PUBLIC
-	serial
 )
-
-
 
 add_library(raspisense
 	src/raspisense.cpp 
@@ -57,11 +57,10 @@ target_link_libraries(raspisense
 	stdc++fs
 )
 
-# Executables
+# ===== Executables =====
 add_executable(simpletest_raspicam 
 	src/simpletest_raspicam_main.cpp
 )  
-
 target_link_libraries (simpletest_raspicam 
 	${raspicam_LIBS}
 )
@@ -76,12 +75,11 @@ target_link_libraries (simpletest_raspicam_cv
   ${OpenCV_LIBS}
 )
 
-# TODO: dont' include serial manually?
 add_executable(simple_m8n_test
 	src/simpletest_m8n.cpp
 )
 target_include_directories(simple_m8n_test
-  PUBLIC
+  PRIVATE
 	lib/serial/include/
 )
 target_link_libraries(simple_m8n_test
@@ -92,7 +90,7 @@ add_executable(m8n_test
 	src/m8n_test_main.cpp 
 	)
 target_include_directories(m8n_test
-  PUBLIC
+  PRIVATE
 	lib/serial/include/
 )
 target_link_libraries(m8n_test
@@ -100,7 +98,6 @@ target_link_libraries(m8n_test
 	ublox_gnss_library
 	cxxopts
 )
-
 
 add_executable(raspisense_main
 	src/raspisense_main.cpp 
