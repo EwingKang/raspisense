@@ -5,12 +5,17 @@
 
 struct RaspiSenseConfig
 {
-	std::string log_path = "";
+	std::string log_prefix = "rslog_";
 	std::string gnss_port = "/dev/ttyAMA1";
 	std::string gnss_dbg_port = "";
 	unsigned int port_retry = 3;
 	float port_retry_interval = 2;		//sec
 	bool enable_gnss_csv = false;
+	
+	
+	// Internal use only, do not set;
+	std::string pvt_log_file;
+	std::string img_dir;
 };
 
 class RaspiSense
@@ -24,7 +29,7 @@ private:
 	RaspiSenseConfig _config;
 	SFE_UBLOX_GNSS _m8n;
 
-	
+	bool InitDirectory();
 	bool InitGnss();
 	bool ConfigGnss();
 	bool InitCamera();

@@ -3,6 +3,7 @@ project (raspicam_test
     VERSION 0.2.0 
     LANGUAGES CXX
 )
+set (CMAKE_CXX_STANDARD 17)
 
 # Required packages
 find_package(raspicam REQUIRED)
@@ -49,8 +50,11 @@ target_include_directories(raspisense
 	lib/serial/include/
 )
 target_link_libraries(raspisense
-	serial
+  PUBLIC
 	ublox_gnss_library
+  PRIVATE
+	serial
+	stdc++fs
 )
 
 # Executables

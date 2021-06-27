@@ -1,11 +1,13 @@
 #include "raspisense.hpp"
 
 #include <chrono>
+#include <ctime>
 #include <thread>   // for sleep
 #include <iostream>
 #include <iomanip>
 #include <bitset>
 #include <fstream>
+#include <filesystem>
 
 #include <ublox_gnss_library.h>
 #include "serial/serial.h"
@@ -14,9 +16,48 @@
 bool RaspiSense::Init(const RaspiSenseConfig & config)
 {
 	_config = config;
+	if( !InitDirectory() ) return false;
 	if( !InitGnss() ) return false;
 	if( !ConfigGnss() ) return false;
 	if( !InitCamera() ) return false;
+	return true;
+}
+
+bool RaspiSense::InitDirectory()
+{
+	auto sys_clk = std::chrono::system_clock::now();
+	std::time_t time_rep = std::chrono::system_clock::to_time_t(sys_clk);
+	std::tm utc_tm = *std::gmtime(&time_rep);
+	
+	std::stringstream str_ymd;
+	str_ymd << utc_tm.tm_year + 1900
+			<< std::setfill('0') << std::setw(2) << utc_tm.tm_mon + 1 
+			<< std::setfill('0') << std::setw(2) << utc_tm.tm_mday
+			<< "_"
+			<< std::setfill('0') << std::setw(2) << utc_tm.tm_hour
+			<< std::setfill('0') << std::setw(2) << utc_tm.tm_min
+			<< std::setfill('0') << std::setw(2) << utc_tm.tm_sec;
+	
+	// Following code require C++20 support
+	//auto dp = std::chrono::floor<std::chrono::days>(sys_clk);  // dp is a sys_days, which is a
+										// type alias for a std::chrono::time_point
+	//std::chrono::year_month_day ymd(sys_clk);
+ 	//std::chrono::hh_mm_ss hms(std::chrono::duration_cast<std::chrono::milliseconds>(sys_clk-dp);
+	//std::cout << "year        = " << ymd.year() << '\n';
+	//std::cout << "month       = " << ymd.month() << '\n';
+	//std::cout << "day         = " << ymd.day() << '\n';
+	//std::cout << "hour        = " << time.hours().count() << "h\n";
+	//std::cout << "minute      = " << time.minutes().count() << "min\n";
+	//std::cout << "second      = " << time.seconds().count() << "s\n";
+	//std::cout << "millisecond = " << time.subseconds().count() << "ms\n";
+	std::string dir_str = _config.log_prefix+str_ymd.str();
+	_config.img_dir =  dir_str + "/images";
+	std::cout << "Creating logger output directory: " << dir_str << std::endl;
+	std::cout << "Creating image output directory: " << _config.img_dir << std::endl;
+	
+	std::filesystem::create_directories(_config.img_dir);
+	_config.pvt_log_file = dir_str+"/pvt_log.bin";
+	
 	return true;
 }
 
@@ -30,12 +71,14 @@ bool RaspiSense::Spin()
 	uint8_t pvt_bin_bfr[pvt_total_len];
 	uint8_t bin_header[8] = {0xFF, 0xFF, 0xFF, 0xAB, 0X00, 0X00, 0x01, 0x00};
 	uint8_t tp_buf[2*sizeof(std::chrono::nanoseconds::rep)];
-	std::ofstream bin_file;
-	bin_file.open("pvt_log.bin", std::ios::binary);
 	
+	std::cout << "Start PVT log to: " << _config.pvt_log_file << std::endl;
+	std::ofstream bin_file;
+	bin_file.open(_config.pvt_log_file, std::ios::binary);
 	
 	auto t0 = std::chrono::steady_clock::now();
 	auto last_pvt_msg_time = t0;
+	auto last_pvt_freq_show_time = t0;
 	
 	int msg_cnt = 0;
 	while(true)
@@ -91,9 +134,15 @@ bool RaspiSense::Spin()
 			else
 			{
 				msg_cnt++;
-				std::chrono::duration<double> diff = tn - t0;
-				std::cout << "Average freq: " << msg_cnt / diff.count() << std::endl;
 				last_pvt_msg_time = tn;
+				
+				//if( (std::chrono::duration_cast<std::chrono::duration<float>(tn - last_pvt_freq_show_time)).count() >= 2 )
+				if( (tn - last_pvt_freq_show_time) >= std::chrono::milliseconds(2000) )
+				{
+					std::chrono::duration<double> diff = tn - t0;
+					std::cout << "Average freq: " << msg_cnt / diff.count() << std::endl;
+					last_pvt_freq_show_time = tn;
+				}
 				
 				_m8n.extractFileBufferData(pvt_bin_bfr, pvt_total_len);
 				std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> sen_start, sen_end;
