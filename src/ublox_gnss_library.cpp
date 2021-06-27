@@ -41,6 +41,7 @@
 */
 #include <iostream>
 #include <algorithm>
+#include <chrono>
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
 #include "spdlog/formatter.h"
@@ -251,7 +252,10 @@ void SFE_UBLOX_GNSS::disableDebugging(void)
 }
 void SFE_UBLOX_GNSS::disableNmeaDebugPrint(void)
 {
-	p_nmea_logger->set_level(spdlog::level::info);
+	if(p_nmea_logger)
+	{
+		p_nmea_logger->set_level(spdlog::level::info);
+	}
 }
 
 //Safely print messages
@@ -771,6 +775,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 {
 	if ((currentSentence == NONE) || (currentSentence == NMEA))
 	{
+		tpSentenceStart = std::chrono::steady_clock::now();;
 		if (incoming == 0xB5) //UBX binary frames start with 0xB5, aka μ
 		{
 			//This is the start of a binary sentence. Reset flags.
@@ -796,6 +801,7 @@ void SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t r
 		{
 			//This character is unknown or we missed the previous start of a sentence
 		}
+		
 	}
 
 	//Depending on the sentence, pass the character to the individual processor
@@ -1029,7 +1035,9 @@ void SFE_UBLOX_GNSS::processNMEA(char incoming)
 	//If user has assigned an output port then pipe the characters there
 	if (_nmeaOutputPort != NULL)
 		_nmeaOutputPort->write((uint8_t *)&incoming,1); //Echo this byte to the serial port
-	p_nmea_logger->debug(incoming);
+	
+	if( p_nmea_logger )
+		p_nmea_logger->debug(incoming);
 }
 
 //We need to be able to identify an RTCM packet and then the length
@@ -1073,6 +1081,7 @@ void SFE_UBLOX_GNSS::processRTCMframe(uint8_t incoming)
 	{
 		//We're done!
 		currentSentence = NONE; //Reset and start looking for next sentence type
+		tpSentenceEnd = std::chrono::steady_clock::now();
 	}
 }
 
@@ -1164,6 +1173,7 @@ void SFE_UBLOX_GNSS::processUBX(uint8_t incoming, ubxPacket *incomingUBX, uint8_
 		incomingUBX->checksumB = incoming;
 
 		currentSentence = NONE; //We're done! Reset the sentence to being looking for a new start char
+		tpSentenceEnd = std::chrono::steady_clock::now();
 
 		//Validate this sentence
 		if ((incomingUBX->checksumA == rollingChecksumA) && (incomingUBX->checksumB == rollingChecksumB))
@@ -3131,6 +3141,11 @@ uint16_t SFE_UBLOX_GNSS::extractFileBufferData(uint8_t *destination, uint16_t nu
 	{
 		fileBufferTail += numBytes; // Only update Tail. The next byte to be read will be read from here.
 	}
+	
+	if(packetUBXNAVPVT->automaticFlags.flags.bits.addToFileBuffer)
+	{
+		setPVTQueried();
+	}
 
 	return (numBytes); // Return the number of bytes extracted
 }
@@ -3146,6 +3161,13 @@ uint16_t SFE_UBLOX_GNSS::fileBufferAvailable(void)
 uint16_t SFE_UBLOX_GNSS::getMaxFileBufferAvail(void)
 {
 	return (fileBufferMaxAvail);
+}
+
+void SFE_UBLOX_GNSS::getSentenceTime(std::chrono::time_point<std::chrono::steady_clock> *tpStart, std::chrono::time_point<std::chrono::steady_clock> *tpEnd)
+{
+	(*tpStart) = tpSentenceStart;
+	(*tpEnd) = tpSentenceEnd;
+	return;	
 }
 
 // PRIVATE: Create the file buffer. Called by .begin
@@ -3428,6 +3450,8 @@ void SFE_UBLOX_GNSS::setSerialRate(uint32_t baudrate, uint8_t uartPort, uint16_t
 		//_debugSerial->println(statusString(retVal));
 		p_dbg_logger->debug("setSerialRate: sendCommand returned: "+std::string(statusString(retVal)) );
 	}
+	
+	_serialPort->setBaudrate(baudrate);
 }
 
 //Configure a port to output UBX, NMEA, RTCM3 or a combination thereof
@@ -9333,6 +9357,11 @@ int32_t SFE_UBLOX_GNSS::getGeoidSeparation(uint16_t maxWait)
 {
 	(void)maxWait;
 	return (0);
+}
+
+void SFE_UBLOX_GNSS::setPVTQueried()
+{
+	packetUBXNAVPVT->moduleQueried.moduleQueried1.bits.all = false;
 }
 
 // ***** HPPOSECEF Helper Functions

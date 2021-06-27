@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.10) 
 project (raspicam_test 
-    VERSION 0.1.0 
+    VERSION 0.2.0 
     LANGUAGES CXX
 )
 
@@ -28,13 +28,29 @@ add_library(ublox_gnss_library
 target_include_directories(ublox_gnss_library 
   PUBLIC
 	include/
+	lib/serial/include/
+  #PRIVATE
+)
+target_link_libraries(ublox_gnss_library
+    PRIVATE
+	${wiringPi_LIB}
+	spdlog
+	PUBLIC
+	serial
+)
+
+
+
+add_library(raspisense
+	src/raspisense.cpp 
+	)
+target_include_directories(raspisense
   PRIVATE
 	lib/serial/include/
 )
-target_link_libraries(ublox_gnss_library
-	${wiringPi_LIB}
-	spdlog
+target_link_libraries(raspisense
 	serial
+	ublox_gnss_library
 )
 
 # Executables
@@ -80,3 +96,13 @@ target_link_libraries(m8n_test
 	ublox_gnss_library
 	cxxopts
 )
+
+
+add_executable(raspisense_main
+	src/raspisense_main.cpp 
+	)
+target_link_libraries(raspisense_main
+	raspisense
+	cxxopts
+)
+

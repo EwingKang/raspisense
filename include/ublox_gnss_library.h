@@ -56,7 +56,7 @@
 
 #ifndef UBLOX_GNSS_LIBRARY_H
 #define UBLOX_GNSS_LIBRARY_H
-
+#include <chrono>
 
 #include "ublox_config_keys.h"
 #include "ublox_structs.h"
@@ -299,6 +299,7 @@ public:
 	uint16_t extractFileBufferData(uint8_t *destination, uint16_t numBytes); // Extract numBytes of data from the file buffer. Copy it to destination. It is the user's responsibility to ensure destination is large enough.
 	uint16_t fileBufferAvailable(void); // Returns the number of bytes available in file buffer which are waiting to be read
 	uint16_t getMaxFileBufferAvail(void); // Returns the maximum number of bytes which the file buffer has contained. Handy for checking the buffer is large enough to handle all the incoming data.
+	void getSentenceTime(std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> *tpStart, std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> *tpEnd);
 
 	// Specific commands
 
@@ -654,6 +655,7 @@ public:
 	float getATTheading(uint16_t maxWait = defaultMaxWait); // Returned as degrees
 
 	// Helper functions for PVT
+	// All the function below sets the internal "queried" flagg to false, indacate the data is read by user.
 
 	uint32_t getTimeOfWeek(uint16_t maxWait = defaultMaxWait);
 	uint16_t getYear(uint16_t maxWait = defaultMaxWait);
@@ -698,6 +700,8 @@ public:
 	uint16_t getMagAcc(uint16_t maxWait = defaultMaxWait);
 
 	int32_t getGeoidSeparation(uint16_t maxWait = defaultMaxWait);
+	
+	void setPVTQueried();
 
 	// Helper functions for HPPOSECEF
 
@@ -932,6 +936,8 @@ private:
 	bool storePacket(ubxPacket *msg); // Add a UBX packet to the file buffer
 	bool storeFileBytes(uint8_t *theBytes, uint16_t numBytes); // Add theBytes to the file buffer
 	void writeToFileBuffer(uint8_t *theBytes, uint16_t numBytes); // Write theBytes to the file buffer
+	
+	std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> tpSentenceStart, tpSentenceEnd;
 };
 
 #endif

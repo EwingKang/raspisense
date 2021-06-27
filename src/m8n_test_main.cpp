@@ -1,6 +1,8 @@
 #include <chrono>
 #include <thread> // for sleep
 #include <iomanip>
+#include <fstream>
+
 #include <cxxopts.hpp>
 #include <ublox_gnss_library.h>
 #include "serial/serial.h"
@@ -83,6 +85,7 @@ int main(int argc, char *argv[])
 	m8n.enableDebugging(m8n_debug);
 	m8n.setNMEAOutputPort(m8n_debug);
 	m8n.disableNmeaDebugPrint();
+	m8n.setFileBufferSize(1024);  // Enable file buffer
 	m8n.begin(m8n_port);
 	
 	std::vector<int> baud_rates {4800,9600,19200,38400,57600,115200,230400,460800 };
@@ -149,10 +152,21 @@ int main(int argc, char *argv[])
 	//m8n.saveConfiguration(); //Save the current settings to flash and BBR
 	
 	
+	m8n.disableDebugging(); // to supress message
+	
+	
 	// Receiving PVT messages
+	m8n.logNAVPVT(true); // enable PVT log to file buffer
+	const int pvt_total_len = UBX_NAV_PVT_LEN+8;
+	uint8_t pvt_bin_bfr[pvt_total_len];
+	uint8_t bin_header[8] = {0xFF, 0xFF, 0xFF, 0xAB, 0X00, 0X00, 0x01, 0x00};
+	uint8_t tp_buf[2*sizeof(std::chrono::nanoseconds::rep)];
+	std::ofstream bin_file;
+	bin_file.open("pvt_log.bin", std::ios::binary);
+	
+	
 	auto t0 = std::chrono::steady_clock::now();
 	int msg_cnt = 0;
-	m8n.disableDebugging();
 	while(true)
 	{
 		bool ret = m8n.getPVT();
@@ -186,9 +200,37 @@ int main(int argc, char *argv[])
 			msg_cnt++;
 			std::chrono::duration<double> diff = tn - t0;
 			std::cout << "Average freq: " << msg_cnt / diff.count() << std::endl;
+			
+			uint16_t avail = m8n.fileBufferAvailable();
+			
+			if(avail != pvt_total_len)
+			{
+				std::cout << "Something went wrong, avail: " << avail << "bytes, clear buffer" << std::endl;
+				uint8_t * trash = new uint8_t[avail];
+				m8n.extractFileBufferData(trash, avail);
+				delete[] trash;
+			}
+			else
+			{
+				m8n.extractFileBufferData(pvt_bin_bfr, pvt_total_len);
+				std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> sen_start, sen_end;
+				m8n.getSentenceTime(&sen_start, &sen_end);
+				
+				std::chrono::nanoseconds::rep start_cnt = sen_start.time_since_epoch().count();
+				std::chrono::nanoseconds::rep end_cnt = sen_end.time_since_epoch().count();
+				
+				memcpy(tp_buf, (uint8_t *)&start_cnt, sizeof(std::chrono::nanoseconds::rep));
+				memcpy(tp_buf+sizeof(std::chrono::nanoseconds::rep), (uint8_t *)&end_cnt, sizeof(std::chrono::nanoseconds::rep));
+				
+				bin_file.write((char *)bin_header, 8);
+				bin_file.write((char *)tp_buf, 2*sizeof(std::chrono::nanoseconds::rep));
+				bin_file.write((char *)pvt_bin_bfr, pvt_total_len);
+			}
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
 	}
+	
+	bin_file.close();
 }
 
 

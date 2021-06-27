@@ -40,7 +40,7 @@ int main(){
 	double alt;
 	int fixType;
 	int satNum;
-	double heading;
+	double heading = 0;
 	int sec = 0, min = 0, hour = 0, day = 0, month = 0, year = 0;
 
 	string gps_input;
