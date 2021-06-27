@@ -52,6 +52,7 @@ target_include_directories(raspisense
 target_link_libraries(raspisense
   PUBLIC
 	ublox_gnss_library
+	${raspicam_LIBS}
   PRIVATE
 	serial
 	stdc++fs

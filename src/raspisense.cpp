@@ -1,18 +1,25 @@
 #include "raspisense.hpp"
 
-#include <chrono>
-#include <ctime>
-#include <thread>   // for sleep
 #include <iostream>
 #include <iomanip>
 #include <bitset>
+#include <chrono>
+#include <ctime>
 #include <fstream>
 #include <filesystem>
+#include <thread>
+#include <condition_variable>
 
 #include <ublox_gnss_library.h>
 #include "serial/serial.h"
 
 
+
+/**************************************************************
+ *                                                            *
+ *====================== Public members ======================*
+ *                                                            *
+ **************************************************************/
 bool RaspiSense::Init(const RaspiSenseConfig & config)
 {
 	_config = config;
@@ -24,6 +31,35 @@ bool RaspiSense::Init(const RaspiSenseConfig & config)
 	_initialized = true;
 	return true;
 }
+
+bool RaspiSense::Spin()
+{
+	if( !_initialized )
+	{
+		std::cout << "RaspiSense hasn't been initialized" << std::endl;
+		return false;
+	}
+	
+	_spin_end = false;
+	_gnss_fixed = false;
+	
+	std::thread cam_thread( &RaspiSense::SpinCamera, this );
+	
+	// TODO: thread for GNSS
+	bool gnss_ret = SpinGnss();
+	_spin_end = true;	
+	
+	cam_thread.join();
+	
+	return gnss_ret;
+}
+
+
+/**************************************************************
+ *                                                            *
+ *===================== Private members ======================*
+ *                                                            *
+ **************************************************************/
 
 bool RaspiSense::InitDirectory()
 {
@@ -58,119 +94,10 @@ bool RaspiSense::InitDirectory()
 	std::cout << "Creating image output directory: " << _config.img_dir << std::endl;
 	
 	std::filesystem::create_directories(_config.img_dir);
-	_config.pvt_log_file = dir_str+"/pvt_log.bin";
+	_config.pvt_log_file = dir_str + "/pvt_log.bin";
+	_config.img_log_file = dir_str + "/img_log.csv";
 	
 	return true;
-}
-
-bool RaspiSense::Spin()
-{
-	if( !_initialized )
-	{
-		std::cout << "RaspiSense hasn't been initialized" << std::endl;
-		return false;
-	}
-	
-	// TODO: put GNSS and CAMERA on different thread since they're not related at all
-	
-	// Receiving PVT messages
-	_m8n.logNAVPVT(true); // enable PVT log to file buffer
-	const int pvt_total_len = UBX_NAV_PVT_LEN+8;
-	uint8_t pvt_bin_bfr[pvt_total_len];
-	uint8_t bin_header[8] = {0xFF, 0xFF, 0xFF, 0xAB, 0X00, 0X00, 0x01, 0x00};
-	uint8_t tp_buf[2*sizeof(std::chrono::nanoseconds::rep)];
-	
-	std::cout << "Start PVT log to: " << _config.pvt_log_file << std::endl;
-	std::ofstream bin_file;
-	bin_file.open(_config.pvt_log_file, std::ios::binary);
-	
-	auto t0 = std::chrono::steady_clock::now();
-	auto last_pvt_msg_time = t0;
-	auto last_pvt_freq_show_time = t0;
-	
-	int msg_cnt = 0;
-	while(true)
-	{
-		bool ret = _m8n.getPVT();
-		if(!ret)
-		{
-			static int last_noret_warn = 0;
-			auto diff = std::chrono::duration_cast<std::chrono::seconds>( std::chrono::steady_clock::now() - last_pvt_msg_time );
-			if(diff.count() > 3 && last_noret_warn != diff.count() )
-			{
-				std::cout << "WARNING: no PVT message for " << diff.count() << "s" << std::endl;
-				last_noret_warn = diff.count();
-			}
-		}
-		else
-		{
-			auto tn = std::chrono::steady_clock::now();
-			
-			if(_config.enable_gnss_csv)
-			{
-				std::cout << "Time: " << _m8n.getYear() << "."
-						<< std::setfill('0') << std::setw(2)
-						<< (int)_m8n.getMonth() << "."
-						<< std::setfill('0') << std::setw(2)
-						<< (int)_m8n.getDay() << " "
-						<< std::setfill('0') << std::setw(2)
-						<< (int)_m8n.getHour() << ":"
-						<< std::setfill('0') << std::setw(2)
-						<< (int)_m8n.getMinute() << ":"
-						<< std::setfill('0') << std::setw(2)
-						<< (int)_m8n.getSecond() << "."
-						<< std::setfill('0') << std::setw(3)
-						<< _m8n.getMillisecond() << ".."
-						<< std::setfill('0') << std::setw(6)
-						<< _m8n.getNanosecond() % 1000000
-						<< ", Fixtype: " << (int)_m8n.getFixType()
-						<< ", LLH (deg, m): ["
-						<< _m8n.getLatitude() << ", "
-						<< _m8n.getLongitude() << ", "
-						<< _m8n.getAltitude() << "]" << std::endl;
-			}
-			
-			uint16_t avail = _m8n.fileBufferAvailable();
-			
-			if(avail != pvt_total_len)
-			{
-				std::cout << "Something went wrong, " << avail << " bytes available in m8n buffer clear buffer" << std::endl;
-				uint8_t * trash = new uint8_t[avail];
-				_m8n.extractFileBufferData(trash, avail);
-				delete[] trash;
-			}
-			else
-			{
-				msg_cnt++;
-				last_pvt_msg_time = tn;
-				
-				//if( (std::chrono::duration_cast<std::chrono::duration<float>(tn - last_pvt_freq_show_time)).count() >= 2 )
-				if( (tn - last_pvt_freq_show_time) >= std::chrono::milliseconds(2000) )
-				{
-					std::chrono::duration<double> diff = tn - t0;
-					std::cout << "Average freq: " << msg_cnt / diff.count() << std::endl;
-					last_pvt_freq_show_time = tn;
-				}
-				
-				_m8n.extractFileBufferData(pvt_bin_bfr, pvt_total_len);
-				std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> sen_start, sen_end;
-				_m8n.getSentenceTime(&sen_start, &sen_end);
-				
-				std::chrono::nanoseconds::rep start_cnt = sen_start.time_since_epoch().count();
-				std::chrono::nanoseconds::rep end_cnt = sen_end.time_since_epoch().count();
-				
-				memcpy(tp_buf, (uint8_t *)&start_cnt, sizeof(std::chrono::nanoseconds::rep));
-				memcpy(tp_buf+sizeof(std::chrono::nanoseconds::rep), (uint8_t *)&end_cnt, sizeof(std::chrono::nanoseconds::rep));
-				
-				bin_file.write((char *)bin_header, 8);
-				bin_file.write((char *)tp_buf, 2*sizeof(std::chrono::nanoseconds::rep));
-				bin_file.write((char *)pvt_bin_bfr, pvt_total_len);
-			}
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-	}
-	
-	bin_file.close();
 }
 
 static serial::Serial m8n_port;
@@ -324,5 +251,203 @@ bool RaspiSense::OpenPort(serial::Serial * tgt_port,
 
 bool RaspiSense::InitCamera()
 {
+	//Open camera 
+	std::cout << "Opening Raspberry Pi Camera..." << std::endl;
+	if ( !_cam.open()) 
+	{
+		std::cerr << "Error opening camera" << std::endl;
+		return false;
+	}
+	
+	//wait a while until camera stabilizes
+	std::cout << "Connected to camera: "<< _cam.getId() 
+			  << " buffer size: " << _cam.getImageBufferSize( ) << std::endl;
+	std::cout << "Sleep 3 secs to stabilizes camera" << std::endl;
+	std::this_thread::sleep_for( std::chrono::seconds(3) );
+	return true;
+}
+
+
+static std::mutex mtx_gnss_fix;
+static std::condition_variable cv_gnss_fix;
+
+bool RaspiSense::SpinGnss()
+{
+	// Receiving PVT messages
+	_m8n.logNAVPVT(true); // enable PVT log to file buffer
+	const int pvt_total_len = UBX_NAV_PVT_LEN+8;
+	uint8_t pvt_bin_bfr[pvt_total_len];
+	uint8_t bin_header[8] = {0xFF, 0xFF, 0xFF, 0xAB, 0X00, 0X00, 0x01, 0x00};
+	uint8_t tp_buf[2*sizeof(std::chrono::nanoseconds::rep)];
+	
+	std::cout << "Start PVT log to: " << _config.pvt_log_file << std::endl;
+	std::ofstream bin_file;
+	bin_file.open(_config.pvt_log_file, std::ios::binary);
+	
+	auto t0 = std::chrono::steady_clock::now();
+	auto last_pvt_msg_time = t0;
+	auto last_pvt_freq_show_time = t0;
+	
+	int msg_cnt = 0;
+	while( !_spin_end )
+	{
+		bool ret = _m8n.getPVT();
+		if(!ret)
+		{
+			static int last_noret_warn = 0;
+			auto diff = std::chrono::duration_cast<std::chrono::seconds>( std::chrono::steady_clock::now() - last_pvt_msg_time );
+			if(diff.count() > 3 && last_noret_warn != diff.count() )
+			{
+				std::cout << "WARNING: no PVT message for " << diff.count() << "s" << std::endl;
+				last_noret_warn = diff.count();
+			}
+		}
+		else
+		{
+			auto tn = std::chrono::steady_clock::now();
+			
+			if(_config.enable_gnss_csv)
+			{
+				std::cout << "Time: " << _m8n.getYear() << "."
+						<< std::setfill('0') << std::setw(2)
+						<< (int)_m8n.getMonth() << "."
+						<< std::setfill('0') << std::setw(2)
+						<< (int)_m8n.getDay() << " "
+						<< std::setfill('0') << std::setw(2)
+						<< (int)_m8n.getHour() << ":"
+						<< std::setfill('0') << std::setw(2)
+						<< (int)_m8n.getMinute() << ":"
+						<< std::setfill('0') << std::setw(2)
+						<< (int)_m8n.getSecond() << "."
+						<< std::setfill('0') << std::setw(3)
+						<< _m8n.getMillisecond() << ".."
+						<< std::setfill('0') << std::setw(6)
+						<< _m8n.getNanosecond() % 1000000
+						<< ", Fixtype: " << (int)_m8n.getFixType()
+						<< ", LLH (deg, m): ["
+						<< _m8n.getLatitude() << ", "
+						<< _m8n.getLongitude() << ", "
+						<< _m8n.getAltitude() << "]" << std::endl;
+			}
+			
+			if( _m8n.getGnssFixOk() && !_gnss_fixed )
+			{
+				std::unique_lock<std::mutex> lk(mtx_gnss_fix);
+				_gnss_fixed = true;
+				lk.unlock();
+				cv_gnss_fix.notify_all();
+			}
+			
+			uint16_t avail = _m8n.fileBufferAvailable();
+			
+			if(avail != pvt_total_len)
+			{
+				std::cout << "Something went wrong, " << avail 
+						  << " bytes in m8n buffer, expecting " << pvt_total_len
+						  << ", clear buffer" << std::endl;
+				uint8_t * trash = new uint8_t[avail];
+				_m8n.extractFileBufferData(trash, avail);
+				delete[] trash;
+			}
+			else
+			{
+				msg_cnt++;
+				last_pvt_msg_time = tn;
+				
+				//if( (std::chrono::duration_cast<std::chrono::duration<float>(tn - last_pvt_freq_show_time)).count() >= 2 )
+				if( (tn - last_pvt_freq_show_time) >= std::chrono::milliseconds(2000) )
+				{
+					std::chrono::duration<double> diff = tn - t0;
+					std::cout << "Average GNSS freq: " << msg_cnt / diff.count() << std::endl;
+					last_pvt_freq_show_time = tn;
+				}
+				
+				_m8n.extractFileBufferData(pvt_bin_bfr, pvt_total_len);
+				std::chrono::time_point<std::chrono::steady_clock,std::chrono::nanoseconds> sen_start, sen_end;
+				_m8n.getSentenceTime(&sen_start, &sen_end);
+				
+				std::chrono::nanoseconds::rep start_cnt = sen_start.time_since_epoch().count();
+				std::chrono::nanoseconds::rep end_cnt = sen_end.time_since_epoch().count();
+				
+				memcpy(tp_buf, (uint8_t *)&start_cnt, sizeof(std::chrono::nanoseconds::rep));
+				memcpy(tp_buf+sizeof(std::chrono::nanoseconds::rep), (uint8_t *)&end_cnt, sizeof(std::chrono::nanoseconds::rep));
+				
+				bin_file.write((char *)bin_header, 8);
+				bin_file.write((char *)tp_buf, 2*sizeof(std::chrono::nanoseconds::rep));
+				bin_file.write((char *)pvt_bin_bfr, pvt_total_len);
+			}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	
+	bin_file.close();
+	return true;
+}
+
+
+bool RaspiSense::SpinCamera()
+{
+	//allocate memory
+	unsigned char *data_bfr = new unsigned char[ _cam.getImageBufferSize() ];
+	
+	if( _config.log_img_after_gnss_fix && !_gnss_fixed )
+	{
+		std::cout << "Wait for GNSS fix to start image logging" << std::endl;
+		std::unique_lock<std::mutex> lk(mtx_gnss_fix);
+		// Here we have to check the status one more time so the
+		// Status is protected by the mutex;
+		if( !_gnss_fixed ) cv_gnss_fix.wait(lk);
+		// lock ends here
+	}
+	
+	std::cout << "Start image meta log to: " << _config.img_log_file << std::endl;
+	std::ofstream csv_file;
+	csv_file.open(_config.img_log_file);
+	csv_file << "idx,timestamp,sdy_clk,img_name" << std::endl;
+	
+	std::cout << "Start capture images" << std::endl;
+	int64_t timestamp=0;
+	unsigned int img_cnt = 0;
+	auto t0 = std::chrono::steady_clock::now();
+	auto last_img_time = t0;
+	while( !_spin_end ) 
+	{
+		// capture
+		_cam.grab();
+		auto tn = std::chrono::steady_clock::now();
+		
+		_cam.retrieve ( &timestamp, data_bfr, raspicam::RASPICAM_FORMAT_IGNORE );//get camera image
+		
+		//save
+		std::stringstream img_name;
+		img_name << _config.img_dir << "/" 
+				 << std::setfill('0') << std::setw(7) << timestamp 
+				 << ".ppm";
+		std::ofstream outFile( img_name.str(), std::ios::binary );
+		
+		outFile << "P6\n"<<_cam.getWidth() <<" "<<_cam.getHeight() <<" 255\n";
+		outFile.write ( (char *)data_bfr, 
+						_cam.getImageTypeSize( raspicam::RASPICAM_FORMAT_RGB ) );
+		
+		csv_file << img_cnt << ","
+				 << std::setfill('0') << std::setw(7) << timestamp  << ","
+				 << tn.time_since_epoch().count() << ","
+				 << std::setfill('0') << std::setw(7) << timestamp << ".ppm"
+				 << std::endl;
+		
+		img_cnt++;
+		if( (tn - last_img_time) >= std::chrono::milliseconds(5000) )
+		{
+			std::chrono::duration<double> diff = tn - t0;
+			std::cout << "Average image freq: " << img_cnt / diff.count() << std::endl;
+			last_img_time = tn;
+		}
+    }
+    
+	csv_file.close();
+	
+	//free resrources    
+	delete data_bfr;
+	
 	return true;
 }

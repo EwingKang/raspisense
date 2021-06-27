@@ -11,7 +11,7 @@ int main ( int argc,char **argv)
 	(void) argc;
 	(void) argv;
 	using namespace std;
-	raspicam::RaspiCam Camera; //Cmaera object
+	raspicam::RaspiCam Camera; //Camera object
 	//Open camera 
 	cout<<"Opening Camera..."<<endl;
 	if ( !Camera.open()) {cerr<<"Error opening camera"<<endl;return -1;}
