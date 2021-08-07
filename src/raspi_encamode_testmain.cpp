@@ -577,7 +577,7 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		params->roi.h = h;
 	}
 	if( result.count("shutter") ) {
-		 params->shutter_speed = result["shutter"].as<int>();
+		params->shutter_speed = result["shutter"].as<int>();
 		std::cout << "Set shutter to: " <<  params->shutter_speed << std::endl;
 	}
 	if( result.count("awbgains") ) {

@@ -778,7 +778,7 @@ void RaspiEncamode::SelfDestruct(const MMAL_STATUS_T & status )
 	MmalstatusToMsg(status);
 	
 	if (_conf.verbose)
-		p_err_logger->error( "Closing down");
+		p_err_logger->info("Closing down");
 
 	// Disable all our ports that are not handled by connections
 	DisablePort(&_p_camera_still_port);
@@ -1142,7 +1142,7 @@ bool RaspiEncamode::Run()
 		}
 
 		if (_conf.verbose)
-			p_err_logger->error( "Finished capture");
+			p_err_logger->info( "Finished capture");
 	}
 	else
 	{
@@ -1621,12 +1621,12 @@ MMAL_STATUS_T RaspiEncamode::CreateCameraComponent(RaspiEncamodeConfig & conf,
 		MMAL_PARAMETER_CAMERA_CONFIG_T cam_config =
 		{
 			{ MMAL_PARAMETER_CAMERA_CONFIG, sizeof(cam_config) },
-			(uint32_t) conf.width, 	// .max_stills_w
+			(uint32_t) conf.width, 		//max_stills_w
 			(uint32_t)  conf.height,	//max_stills_h
 			(uint32_t) 0,				//stills_yuv422
 			(uint32_t) 0,				//one_shot_stills
-			(uint32_t) conf.width,	//max_preview_video_w
-			(uint32_t) conf.height,	//max_preview_video_h
+			(uint32_t) conf.width,		//max_preview_video_w
+			(uint32_t) conf.height,		//max_preview_video_h
 			(uint32_t) 3 + vcos_max(0, (conf.framerate-30)/10),//num_preview_video_frames
 			(uint32_t) 0,				//stills_capture_circular_buffer_height
 			(uint32_t) 0,				//fast_preview_resume
@@ -1665,9 +1665,9 @@ MMAL_STATUS_T RaspiEncamode::CreateCameraComponent(RaspiEncamodeConfig & conf,
 	{
 		if (conf.framerate > 1000000./conf.camera_parameters.shutter_speed)
 		{
-			conf.framerate=0;
+			conf.framerate = 0;
 			if (conf.verbose)
-				p_err_logger->error( "Enable dynamic frame rate to fulfil shutter speed requirement");
+				p_err_logger->info("Enable dynamic frame rate to fulfil shutter speed requirement");
 		}
 	}
 
@@ -1778,7 +1778,7 @@ MMAL_STATUS_T RaspiEncamode::CreateCameraComponent(RaspiEncamodeConfig & conf,
 	// update_annotation_data(state);
 
 	if (conf.verbose)
-		p_err_logger->error( "Camera component done");
+		p_err_logger->info("Camera component done");
 
 	return status;
 }
@@ -1927,7 +1927,7 @@ MMAL_STATUS_T RaspiEncamode::CreateSplitterComponent(
 	(*splitter_component) = splitter;
 
 	if (conf.verbose)
-		p_err_logger->error( "Splitter component done");
+		p_err_logger->info("Splitter component done");
 
 	return status;
 }
@@ -2359,7 +2359,7 @@ int RaspiEncamode::WaitForNextChange()
 	case WaitMethod::KEYPRESS:
 	{
 		if (_conf.verbose)
-			p_err_logger->error( "Press Enter to {}, X then ENTER to exit, [i,o,r] then ENTER to change zoom", _is_capturing ? "pause" : "capture");
+			p_err_logger->info( "Press Enter to {}, X then ENTER to exit, [i,o,r] then ENTER to change zoom", _is_capturing ? "pause" : "capture");
 		
 		char ch = getchar();
 		if (ch == 'x' || ch == 'X')
@@ -2369,7 +2369,7 @@ int RaspiEncamode::WaitForNextChange()
 		else if (ch == 'i' || ch == 'I')
 		{
 			if (_conf.verbose)
-				p_err_logger->error( "Starting zoom in");
+				p_err_logger->info("Starting zoom in");
 
 			RaspiCamControl::ZoomInOut(_p_camera_component, RaspiCamControl::ZOOM_COMMAND_T::ZOOM_IN, &(_conf.camera_parameters.roi));
 
@@ -2379,7 +2379,7 @@ int RaspiEncamode::WaitForNextChange()
 		else if (ch == 'o' || ch == 'O')
 		{
 			if (_conf.verbose)
-				p_err_logger->error( "Starting zoom out");
+				p_err_logger->info("Starting zoom out");
 
 			RaspiCamControl::ZoomInOut(_p_camera_component, RaspiCamControl::ZOOM_COMMAND_T::ZOOM_OUT, &(_conf.camera_parameters.roi));
 
@@ -2389,7 +2389,7 @@ int RaspiEncamode::WaitForNextChange()
 		else if (ch == 'r' || ch == 'R')
 		{
 			if (_conf.verbose)
-				p_err_logger->error( "starting reset zoom");
+				p_err_logger->info("starting reset zoom");
 
 			RaspiCamControl::ZoomInOut(_p_camera_component, RaspiCamControl::ZOOM_COMMAND_T::ZOOM_RESET, &(_conf.camera_parameters.roi));
 
@@ -2417,7 +2417,7 @@ int RaspiEncamode::WaitForNextChange()
 
 		if (_conf.verbose)
 		{
-			p_err_logger->error( "Waiting for SIGUSR1 to {}", _is_capturing ? "pause" : "capture");
+			p_err_logger->info( "Waiting for SIGUSR1 to {}", _is_capturing ? "pause" : "capture");
 		}
 
 		result = sigwait( &waitset, &sig );
