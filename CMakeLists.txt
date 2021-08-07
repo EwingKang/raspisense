@@ -10,7 +10,6 @@ find_package(raspicam REQUIRED)
 message( "Raspcam lib: ${raspicam_INCLUDE_DIR}" )
 find_package(OpenCV REQUIRED)
 message( "Open CV version: ${OpenCV_VERSION}" )
-
 find_library(wiringPi_LIB wiringPi)
 message( "Find WiringPI lib" )
 
@@ -42,6 +41,25 @@ target_link_libraries(ublox_gnss_library
 	spdlog
 )
 
+add_library(bcm_host IMPORTED SHARED)
+  #PATHS /opt/vc/lib/libbcm_host.so)
+target_include_directories(bcm_host
+  INTERFACE
+	/opt/vc/include
+)
+target_link_directories(bcm_host
+  INTERFACE
+	/opt/vc/lib
+)
+set_target_properties(bcm_host PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libbcm_host.so )
+
+add_library(mmal IMPORTED SHARED)
+target_include_directories(mmal
+  INTERFACE
+	/opt/vc/include
+)
+set_target_properties(mmal PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libmmal.so )
+
 add_library(raspisense
 	src/raspisense.cpp 
 	)
@@ -56,6 +74,26 @@ target_link_libraries(raspisense
   PRIVATE
 	serial
 	stdc++fs
+)
+
+add_library(raspi_encamode
+	src/raspi_encamode.cpp
+	src/raspicam_camcontrol.cpp
+)
+target_include_directories(raspi_encamode
+  PUBLIC
+	include/
+	dependencies/interface/mmal/
+	#dependencies/
+  PRIVATE
+)
+target_link_libraries(raspi_encamode
+  PUBLIC
+	mmal
+  PRIVATE
+	spdlog
+	bcm_host
+	#${raspicam_LIBS}
 )
 
 # ===== Executables =====
@@ -98,6 +136,14 @@ target_link_libraries(m8n_test
 	serial
 	ublox_gnss_library
 	cxxopts
+)
+
+add_executable(raspi_encamode_test
+	src/raspi_encamode_testmain.cpp)
+target_link_libraries(raspi_encamode_test
+  PRIVATE
+	cxxopts
+	raspi_encamode
 )
 
 add_executable(raspisense_main
