@@ -56,50 +56,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #endif
 #include <thread>
 
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <ctype.h>
-//#include <memory.h>
-//#include <sysexits.h>
 
-//#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-//#include <time.h>
 
 extern "C" {
-//TODO	_VC_TVSERVICE_DEFS_H_
-//#include "interface/vmcs_host/vc_tvservice_defs.h"
 #include "bcm_host.h"
-#include "interface/vcos/vcos.h"
 }
 
+// Logger
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
 #include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "interface/mmal/mmal.h"
-#include "interface/mmal/mmal_logging.h"
 #include "interface/mmal/mmal_buffer.h"
 #include "interface/mmal/util/mmal_util.h"
 #include "interface/mmal/util/mmal_util_params.h"
 #include "interface/mmal/util/mmal_default_components.h"
 #include "interface/mmal/util/mmal_connection.h"
 #include "interface/mmal/mmal_parameters_camera.h"
-
-//#include "raspicam_camcontrol.hpp"
-//#include "RaspiCommonSettings.h"
-//#include "RaspiCamControl.h"
-//#include "RaspiPreview.h"
-//#include "RaspiCLI.h"
-//#include "RaspiHelpers.h"
-//#include "RaspiGPS.h"
-
-//#include <semaphore.h>
-
-//#include <stdbool.h>
 
 #include "raspi_encamode_configs.hpp"
 #include "raspi_encamode.hpp"
@@ -115,7 +92,7 @@ static int timeStamp_GlobalCounter=0;
 
 //TBD: EWING
 // [] Replace vcos log and fprintf log
-// [] vcos_assert
+// [O] vcos_assert
 // [] Linux file 
 // [O] vcos_sleep
 
@@ -1063,10 +1040,10 @@ bool RaspiEncamode::Run()
 			MMAL_BUFFER_HEADER_T *buffer = mmal_queue_get(_p_encoder_pool->queue);
 
 			if (!buffer)
-				vcos_log_error("Unable to get a required buffer %d from pool queue", q);
+				p_err_logger->error("Unable to get a required buffer {} from pool queue", q);
 
 			if (mmal_port_send_buffer(_p_encoder_output_port, buffer)!= MMAL_SUCCESS)
-				vcos_log_error("Unable to send a buffer to encoder output port (%d)", q);
+				p_err_logger->error("Unable to send a buffer to encoder output port ({})", q);
 		}
 	}
 
@@ -1080,10 +1057,10 @@ bool RaspiEncamode::Run()
 			MMAL_BUFFER_HEADER_T *buffer = mmal_queue_get(_p_splitter_pool->queue);
 
 			if (!buffer)
-				vcos_log_error("Unable to get a required buffer %d from pool queue", q);
+				p_err_logger->error("Unable to get a required buffer {} from pool queue", q);
 
 			if (mmal_port_send_buffer(_p_splitter_output_port, buffer)!= MMAL_SUCCESS)
-				vcos_log_error("Unable to send a buffer to splitter output port (%d)", q);
+				p_err_logger->error("Unable to send a buffer to splitter output port ({})", q);
 		}
 	}
 	
@@ -1255,8 +1232,12 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 		int bytes_written = buffer->length;
 		int64_t current_time = GetSteadyMs64();
 
-		vcos_assert(pData->file_handle);
-		if(pData->pconfig->inlineMotionVectors) vcos_assert(pData->imv_file_handle);
+		assert(pData->file_handle); //vcos_assert(pData->file_handle);
+		if(pData->pconfig->inlineMotionVectors) 
+		{
+			//vcos_assert(pData->imv_file_handle);
+			assert(pData->imv_file_handle);
+		}
 
 		if (pData->cb_buff)
 		{
@@ -1499,7 +1480,8 @@ void RaspiEncamode::SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER
 			pData->pconfig->raw_output_fmt == RawOutputFmt::ROF_GRAY )
 			bytes_to_write = port->format->es->video.width * port->format->es->video.height;
 
-		vcos_assert(pData->raw_file_handle);
+		//vcos_assert(pData->raw_file_handle);
+		assert(pData->raw_file_handle);
 
 		if( bytes_to_write )
 		{
@@ -1627,7 +1609,7 @@ MMAL_STATUS_T RaspiEncamode::CreateCameraComponent(RaspiEncamodeConfig & conf,
 			(uint32_t) 0,				//one_shot_stills
 			(uint32_t) conf.width,		//max_preview_video_w
 			(uint32_t) conf.height,		//max_preview_video_h
-			(uint32_t) 3 + vcos_max(0, (conf.framerate-30)/10),//num_preview_video_frames
+			(uint32_t) 3 + std::max(0, (conf.framerate-30)/10),//num_preview_video_frames
 			(uint32_t) 0,				//stills_capture_circular_buffer_height
 			(uint32_t) 0,				//fast_preview_resume
 			MMAL_PARAM_TIMESTAMP_MODE_RAW_STC	//use_stc_timestamp
@@ -2208,7 +2190,7 @@ MMAL_STATUS_T RaspiEncamode::CreateEncoderComponent(
 			status = mmal_port_parameter_get(encoder_output, &param.hdr);
 			if (status != MMAL_SUCCESS)
 			{
-				vcos_log_warn("Unable to get existing H264 intra-refresh values. Please update your firmware");
+				p_err_logger->warn("Unable to get existing H264 intra-refresh values. Please update your firmware");
 				// Set some defaults, don't just pass random stack data
 				param.air_mbs = param.air_ref = param.cir_mbs = param.pir_mbs = 0;
 			}
