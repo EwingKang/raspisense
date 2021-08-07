@@ -56,9 +56,18 @@ set_target_properties(bcm_host PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libbcm_h
 add_library(mmal IMPORTED SHARED)
 target_include_directories(mmal
   INTERFACE
-	/opt/vc/include
+	/opt/vc/include/interface/mmal
+	/opt/vc/include     # for vcos required by mmal_common.h
 )
 set_target_properties(mmal PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libmmal.so )
+
+# Not currently directly needed
+add_library(vcos IMPORTED SHARED)
+target_include_directories(vcos
+  INTERFACE
+	/opt/vc/include/interface/vcos
+)
+set_target_properties(vcos PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libvcos.so )
 
 add_library(raspisense
 	src/raspisense.cpp 
@@ -83,7 +92,7 @@ add_library(raspi_encamode
 target_include_directories(raspi_encamode
   PUBLIC
 	include/
-	dependencies/interface/mmal/
+	#dependencies/interface/mmal/
 	#dependencies/
   PRIVATE
 )

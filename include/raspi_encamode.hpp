@@ -2,7 +2,7 @@
 #define RASPI_ENCAMODE_HPP__
 
 #include <cstdint>
-#include "interface/mmal/mmal.h"
+#include "mmal.h"
 #include "mmal_parameters_video.h"
 #include "util/mmal_connection.h"
 #include "raspi_encamode_configs.hpp" 
