@@ -133,6 +133,9 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		("save-pts",
 		 "Save Timestamps to file for mkvmerge",
 		 cxxopts::value<std::string>()  ) //1
+		("raw-pts",
+		 "Save Raw Timestamps to file",
+		 cxxopts::value<std::string>()  ) 
 		("codec",
 		 "Specify the codec to use - H264 (default) or MJPEG", cxxopts::value<std::string>()->default_value("H264")  ) //1
 		("level",
@@ -213,8 +216,17 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		{ "opacity",   "Preview window opacity (0-255)", cxxopts::value<int>()},
 		{ "n,nopreview",  "Do not display a preview window", cxxopts::value<bool>()}
 	} );
-		
-	cxxopts::ParseResult result = opt.parse(argc, argv);
+	
+	cxxopts::ParseResult result;
+	try
+	{
+		result = opt.parse(argc, argv);
+	}
+	catch(...)
+	{
+		std::cout << opt.help({"", "common","camera","preview"}) << std::endl;
+		throw;
+	}
 	if(result.count("help"))
 	{
 		std::cout << opt.help({"", "common","camera","preview"}) << std::endl;
@@ -321,8 +333,8 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		std::cout << "Set segment wrap to: " << conf->segmentWrap << std::endl;
 	}
 	if(result.count("start")) {
-		conf->segmentNumber = result["start"].as<int>();
-		std::cout << "Set segment number to: "<< conf->segmentNumber << std::endl;
+		conf->startingSegmentNumber = result["start"].as<int>();
+		std::cout << "Set segment number to: "<< conf->startingSegmentNumber << std::endl;
 	}
 	if(result.count("split")) {
 		std::cout << "Enable split" << std::endl;
@@ -358,6 +370,11 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		conf->save_pts = 1;
 		conf->pts_filename = result["save-pts"].as<std::string>();
 		std::cout << "Save pts file to: " << conf->pts_filename << std::endl;
+	}
+	if(result.count("raw-pts")) {
+		conf->save_raw_pts = true;
+		conf->raw_pts_filename = result["raw-pts"].as<std::string>();
+		std::cout << "Save raw pts file to: " << conf->raw_pts_filename << std::endl;
 	}
 	if(result.count("codec")) {
 		std::string str_codec = result["codec"].as<std::string>();
@@ -757,7 +774,6 @@ int main(int argc, const char **argv)
 {
 	//TBD
 	int exit_code = 0;
-	
 	signal(SIGINT, default_signal_handler);  // TBD
 	// Disable USR1 for the moment - may be reenabled if go in to signal capture mode
 	signal(SIGUSR1, SIG_IGN);
@@ -772,7 +788,6 @@ int main(int argc, const char **argv)
 	}
 
 	// Our main data storage vessel..
-	//ORIG RaspiVidState state;
 	RaspiEncamodeConfig rec_config;
 	rec_config.SetDefault();
 	int demoMode = 0;        /// Run app in demo mode
@@ -816,6 +831,7 @@ int main(int argc, const char **argv)
 	//WIP copied till here
 	
 	// TODO
+		//ORIG RaspiVidState state;
 // 	if (status != MMAL_SUCCESS)
 // 		raspicamcontrol_check_configuration(128);
 

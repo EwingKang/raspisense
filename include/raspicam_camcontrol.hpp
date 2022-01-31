@@ -275,6 +275,14 @@ namespace RaspiCamControl
 	{"high",          MMAL_PARAMETER_DRC_STRENGTH_HIGH}
 	};
 	
+	static std::unordered_map<uint32_t id, std::string> mmal_param_names = 
+	{
+		{MMAL_PARAMETER_SATURATION, "saturation"},
+		{MMAL_PARAMETER_SHARPNESS,"sharpness"},
+		{MMAL_PARAMETER_CONTRAST,"contrast"},
+		{MMAL_PARAMETER_BRIGHTNESS,"brightness"}
+	}
+	
 	void BuildRevMap(); // Note: this must be called before the usage of parameter dump
 	
 	
@@ -290,18 +298,18 @@ namespace RaspiCamControl
 	void DumpParameters(const CamConfig &params);
 	
 	int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params);
-	int raspicamcontrol_get_all_parameters(MMAL_COMPONENT_T *camera, CamConfig *params);
+	int GetAllParameters(MMAL_COMPONENT_T *camera, CamConfig *params);
 
 	void SetDefaults(CamConfig *params);
 
 	void raspicamcontrol_check_configuration(int min_gpu_mem);
 
-	// Individual setting functions
+	// Individual set functions
 	int SetSaturation(MMAL_COMPONENT_T *camera, int saturation);
 	int SetSharpness(MMAL_COMPONENT_T *camera, int sharpness);
 	int SetContrast(MMAL_COMPONENT_T *camera, int contrast);
 	int SetBrightness(MMAL_COMPONENT_T *camera, int brightness);
-	int raspicamcontrol_set_ISO(MMAL_COMPONENT_T *camera, int ISO);
+	int SetISO(MMAL_COMPONENT_T *camera, int ISO);
 	int SetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T mode);
 	int SetVideoStabilisation(MMAL_COMPONENT_T *camera, int vstabilisation);
 	int SetExposureCompensation(MMAL_COMPONENT_T *camera, int exp_comp);
@@ -324,7 +332,34 @@ namespace RaspiCamControl
 	int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	
-	
+	// Individual get functions
+	int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value);
+	int GetSaturation(MMAL_COMPONENT_T *camera, int *saturation);
+	int GetSharpness(MMAL_COMPONENT_T *camera, int sharpness);
+	int GetContrast(MMAL_COMPONENT_T *camera, int contrast);
+	int GetBrightness(MMAL_COMPONENT_T *camera, int brightness);
+	int GetISO(MMAL_COMPONENT_T *camera, int ISO);
+	int GetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T mode);
+	int GetVideoStabilisation(MMAL_COMPONENT_T *camera, int vstabilisation);
+	int GetExposureCompensation(MMAL_COMPONENT_T *camera, int exp_comp);
+	int GetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode);
+	int GetFlicker_avoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode);
+	int GetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T awb_mode);
+	int GetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain);
+	int GetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T imageFX);
+	int GetColourFX(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *colourFX);
+	int GetRotation(MMAL_COMPONENT_T *camera, int rotation);
+	int GetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip);
+	int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect);
+	int ZoomInOut(MMAL_COMPONENT_T *camera, ZOOM_COMMAND_T zoom_command, FloatRect *roi);
+	int GetShutterSpeed(MMAL_COMPONENT_T *camera, int speed_ms);
+	int raspicamcontrol_set_DRC(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
+	int GetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass);
+	int GetAnnotate(MMAL_COMPONENT_T *camera, const int bitmask, const char *string,
+									const int text_size, const int text_colour, const int bg_colour,
+									const unsigned int justify, const unsigned int x, const unsigned int y);
+	int GetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
+	int GetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 } // end of namespace RaspiCamControl
 
 // undefined
@@ -335,10 +370,7 @@ namespace RaspiCamControl
 
 /* Undefined
 //Individual getting functions
-int raspicamcontrol_get_saturation(MMAL_COMPONENT_T *camera);
-int raspicamcontrol_get_sharpness(MMAL_COMPONENT_T *camera);
-int raspicamcontrol_get_contrast(MMAL_COMPONENT_T *camera);
-int raspicamcontrol_get_brightness(MMAL_COMPONENT_T *camera);
+
 int raspicamcontrol_get_ISO(MMAL_COMPONENT_T *camera);
 MMAL_PARAM_EXPOSUREMETERINGMODE_T raspicamcontrol_get_metering_mode(MMAL_COMPONENT_T *camera);
 int raspicamcontrol_get_video_stabilisation(MMAL_COMPONENT_T *camera);

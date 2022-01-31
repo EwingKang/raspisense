@@ -32,25 +32,6 @@ const int MAX_BITRATE_LEVEL42 = 62500000; // 62.5Mbits/s
 /// Interval at which we check for an failure abort during capture
 const int ABORT_INTERVAL = 100; // ms
 
-//============= RaspiCamControl.h
-/// Annotate bitmask options
-/// Supplied by user on command line
-#define ANNOTATE_USER_TEXT          1
-/// Supplied by app using this module
-#define ANNOTATE_APP_TEXT           2
-/// Insert current date
-#define ANNOTATE_DATE_TEXT          4
-// Insert current time
-#define ANNOTATE_TIME_TEXT          8
-
-#define ANNOTATE_SHUTTER_SETTINGS   16
-#define ANNOTATE_CAF_SETTINGS       32
-#define ANNOTATE_GAIN_SETTINGS      64
-#define ANNOTATE_LENS_SETTINGS      128
-#define ANNOTATE_MOTION_SETTINGS    256
-#define ANNOTATE_FRAME_NUMBER       512
-#define ANNOTATE_BLACK_BACKGROUND   1024
-
 /// Capture/Pause switch method
 /// Simply capture for time specified
 enum class WaitMethod
@@ -108,7 +89,7 @@ struct RaspiEncamodeConfig
 
 	int segmentSize;                /// Segment mode In timed cycle mode, the amount of time the capture is off per cycle
 	int segmentWrap;                /// Point at which to wrap segment counter
-	int segmentNumber;              /// Current segment counter
+	int startingSegmentNumber;      /// Current segment counter
 	int splitWait;                  /// Switch if user wants splited files
 	
 	// ========== Preview parameters ==========
@@ -129,7 +110,9 @@ struct RaspiEncamodeConfig
 	MMAL_VIDEO_INTRA_REFRESH_T intra_refresh_type;         /// What intra refresh type to use. -1 to not set.
 	
 	std::string pts_filename;
+	std::string raw_pts_filename;
 	int save_pts;
+	bool save_raw_pts;
 	
 
 	bool netListen;
@@ -170,7 +153,7 @@ public:
 		this->offTime = 5000;
 		this->bInlineHeaders = 0;
 		this->segmentSize = 0;  // 0 = not segmenting the file.
-		this->segmentNumber = 1;
+		this->startingSegmentNumber = 1;
 		this->segmentWrap = 0; // Point at which to wrap segment number back to 1. 0 = no wrap
 		
 		this->splitWait = 0;
@@ -180,6 +163,7 @@ public:
 		this->inlineMotionVectors = 0;
 		this->intra_refresh_type = (MMAL_VIDEO_INTRA_REFRESH_T)0xFFFFFFFF;
 		this->save_pts = 0;
+		this->save_raw_pts = false;
 		this->netListen = false;
 		this->addSPSTiming = MMAL_FALSE;
 		this->slices = 1;

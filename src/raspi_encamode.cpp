@@ -84,7 +84,7 @@ extern "C" {
 // TODO EWING is this correct?
 static std::shared_ptr<spdlog::logger> p_err_logger;
 
-static int64_t GPUCPUMONOTONICOFFSET = 0;
+//static int64_t GPUCPUMONOTONICOFFSET = 0;
 static int timeStamp_GlobalCounter=0;
 
 /// Layer that preview window should be displayed on
@@ -114,12 +114,18 @@ bool RaspiEncamode::Init(const RaspiEncamodeConfig & conf)
 	RaspiCamControl::BuildRevMap();
 	bcm_host_init();
 	_conf = conf;
-	_frame = 0;
+	_spl_frame_cntr = 0;
+	_spl_frame_steady_us = 0;
+	
+	_enc_frame_cntr = 0;
+	_enc_frame_steady_us = 0;
 	_startpts = 0;
 	_lastpts = 0;
 	
 	_split_now = false;
 	_is_capturing = false;
+	
+	_seg_num = _conf.startingSegmentNumber;
 	
 	// Register our application with the logging system
 	//vcos_log_register("RaspiVid", VCOS_LOG_CATEGORY);
@@ -313,7 +319,7 @@ void RaspiEncamode::DumpConfig(const RaspiEncamodeConfig & conf)
 {
 	//ORIG raspicommonsettings_dump_parameters(&conf.common_settings);
 	{
-		p_err_logger->error( "Camera Name %s", conf.camera_name);
+		p_err_logger->error( "Camera Name: {}", conf.camera_name);
 		p_err_logger->error( "Width {}, Height {}, filename {}", 
 							 conf.width, conf.height, conf.filename);
 		p_err_logger->error( "Using camera {}, sensor mode {}\n", 
@@ -333,7 +339,7 @@ void RaspiEncamode::DumpConfig(const RaspiEncamodeConfig & conf)
 
 	// Not going to display segment data unless asked for it.
 	if (conf.segmentSize)
-		p_err_logger->error( "Segment size {}, segment wrap value {}, initial segment number {}", conf.segmentSize, conf.segmentWrap, conf.segmentNumber);
+		p_err_logger->error( "Segment size {}, segment wrap value {}, initial segment number {}", conf.segmentSize, conf.segmentWrap, conf.startingSegmentNumber);
 
 	if (conf.raw_output)
 		p_err_logger->error( "Raw output enabled, format {}", raw_output_fmt_map_rev.at(conf.raw_output_fmt));
@@ -366,6 +372,7 @@ void RaspiEncamode::DumpConfig(const RaspiEncamodeConfig & conf)
 // TODO: what about switching to c++ style file?
 static bool open_filename(const RaspiEncamodeConfig &config,
 						  const std::string &filename_in,
+						  const int & segnum,
 						  FILE ** filed)
 {
 	FILE *new_handle = NULL;  //TBD
@@ -389,7 +396,7 @@ static bool open_filename(const RaspiEncamodeConfig &config,
 		if (pos_percent!= filename.npos && pos_end != filename.npos)
 		{
 			//bSegmentNumber = true;
-			asprintf(&ttt, filename.c_str(), config.segmentNumber);
+			asprintf(&ttt, filename.c_str(), segnum);
 		}
 		else
 		{
@@ -786,6 +793,8 @@ void RaspiEncamode::SelfDestruct(const MMAL_STATUS_T & status )
 		fclose(_callback_data.pts_file_handle);
 	if (_callback_data.raw_file_handle && _callback_data.raw_file_handle != stdout)
 		fclose(_callback_data.raw_file_handle);
+	if (_callback_data.raw_pts_file_handle && _callback_data.raw_pts_file_handle != stdout)
+		fclose(_callback_data.raw_pts_file_handle);
 
 	/* Disable components */
 	if (_p_encoder_component)
@@ -814,9 +823,9 @@ void RaspiEncamode::SelfDestruct(const MMAL_STATUS_T & status )
 // Set up our userdata - this is passed though to the callback where we need the information.
 bool RaspiEncamode::ConfigureCallback()
 {
-	_callback_data.pconfig = &_conf;
-	_callback_data.abort = 0;
+	//_callback_data.pconfig = &_conf;
 	_callback_data.pact_obj = this;
+	_callback_data.abort = 0;
 	_callback_data.flush_buffers = _conf.flush_buffers;
 
 	MMAL_STATUS_T status;
@@ -831,7 +840,6 @@ bool RaspiEncamode::ConfigureCallback()
 		status = mmal_port_enable(
 					_p_splitter_output_port,
 					SplitterBufferCallbackWrapper);
-					//&RaspiEncamode::SplitterBufferCallback  );
 
 		if (status != MMAL_SUCCESS)
 		{
@@ -851,7 +859,7 @@ bool RaspiEncamode::ConfigureCallback()
 		}
 		else
 		{
-			if( !open_filename(_conf, _conf.filename, &_callback_data.file_handle) )
+			if( !open_filename(_conf, _conf.filename, _seg_num,  &_callback_data.file_handle) )
 			{
 				p_err_logger->error("File opening failed with filename: {}", _conf.filename);
 				return false;
@@ -875,7 +883,7 @@ bool RaspiEncamode::ConfigureCallback()
 		}
 		else
 		{
-			if( !open_filename(_conf, _conf.imv_filename, &_callback_data.imv_file_handle))
+			if( !open_filename(_conf, _conf.imv_filename, _seg_num, &_callback_data.imv_file_handle))
 			{
 				p_err_logger->error("File opening failed with filename: {}", _conf.imv_filename);
 				return false;
@@ -891,7 +899,6 @@ bool RaspiEncamode::ConfigureCallback()
 	}
 
 	_callback_data.pts_file_handle = NULL;
-
 	if( !_conf.pts_filename.empty() )
 	{
 		if (_conf.pts_filename[0] == '-')
@@ -900,12 +907,16 @@ bool RaspiEncamode::ConfigureCallback()
 		}
 		else
 		{
-			if( !open_filename(_conf, _conf.pts_filename, &_callback_data.pts_file_handle))
+			if( !open_filename(_conf, _conf.pts_filename, _seg_num, &_callback_data.pts_file_handle))
 			{
 				p_err_logger->error( "Error opening pts output file: {}",_conf.pts_filename);
 			}
-			if (_callback_data.pts_file_handle) /* save header for mkvmerge */
-				fprintf(_callback_data.pts_file_handle, "# timecode format v2");
+			if (_callback_data.pts_file_handle) 
+			{
+				//Orig: save header for mkvmerge, in milliseconds
+				//fprintf(_callback_data.pts_file_handle, "# timecode format v2");
+				fprintf(_callback_data.pts_file_handle, "pts,enc_cntr,enc_stdclk\n");
+			}
 		}
 
 		if (!_callback_data.pts_file_handle)
@@ -917,7 +928,6 @@ bool RaspiEncamode::ConfigureCallback()
 	}
 
 	_callback_data.raw_file_handle = NULL;
-
 	if( !_conf.raw_filename.empty() )
 	{
 		if (_conf.raw_filename[0] == '-')
@@ -926,7 +936,7 @@ bool RaspiEncamode::ConfigureCallback()
 		}
 		else
 		{
-			if( !open_filename(_conf, _conf.raw_filename, &_callback_data.raw_file_handle) )
+			if( !open_filename(_conf, _conf.raw_filename, _seg_num, &_callback_data.raw_file_handle) )
 			{
 				p_err_logger->error( "Error opening raw output file: {}", _conf.raw_filename);
 			}
@@ -937,6 +947,34 @@ bool RaspiEncamode::ConfigureCallback()
 			// Notify user, carry on but discarding encoded output buffers
 			p_err_logger->error( "Error opening output file: {}\nNo output file will be generated", _conf.raw_filename);
 			_conf.raw_output = 0;
+		}
+	}
+	
+	_callback_data.raw_pts_file_handle = NULL;
+	if( !_conf.raw_pts_filename.empty() )
+	{
+		if (_conf.raw_pts_filename[0] == '-')
+		{
+			_callback_data.raw_pts_file_handle = stdout;
+		}
+		else
+		{
+			if( !open_filename(_conf, _conf.raw_pts_filename, _seg_num, &_callback_data.raw_pts_file_handle))
+			{
+				p_err_logger->error( "Error opening raw pts output file: {}",_conf.raw_pts_filename);
+			}
+			if (_callback_data.raw_pts_file_handle) 
+			{
+				//Orig: save header for mkvmerge, in milliseconds
+				//fprintf(_callback_data.raw_pts_file_handle, "# timecode format v2");
+				fprintf(_callback_data.raw_pts_file_handle, "pts,spl_cntr,spl_stdclk\n");
+			}
+		}
+		if (!_callback_data.raw_pts_file_handle)
+		{
+			// Notify user, carry on but discarding encoded output 	buffers
+			p_err_logger->error( "Error opening output file: {}\nNo output file will be generated",_conf.raw_pts_filename);
+			_conf.save_raw_pts = false;
 		}
 	}
 
@@ -999,12 +1037,12 @@ bool RaspiEncamode::EnablePort()
 	param.hdr.size = sizeof(param);
 	param.value = -1;
 	mmal_port_parameter_get(_p_encoder_output_port, &param.hdr);//time in microseconds
-	uint64_t pts=param.value/1000;
-	//uint64_t cpumonotonic=GetSteadyMs64();   // do this?
-	uint64_t cpumonotonic=GetMsSinceUtcToday();
-	//cpumonotonic=GPUCPUMONOTONICOFFSET+pts;
-	GPUCPUMONOTONICOFFSET=cpumonotonic-pts;
-	p_err_logger->info( "(ms) GPU: {}, CPU: {}, OFFSET= {}", pts ,cpumonotonic, GPUCPUMONOTONICOFFSET);
+	
+	uint64_t cpumonotoniccc=GetSteadyUs64();   //TODO do this?
+	uint64_t utc = GetUtcUs();
+	uint64_t utc_today =GetUsSinceUtcToday();
+	//GPUCPUMONOTONICOFFSET=cpumonotonic-(param.value/1000);
+	p_err_logger->info( "Starting at(us) GPU: {}, CPU: {}, UTC: {}, UTC us since today: {}", param.value, cpumonotoniccc, utc, utc_today);
 
 	// Set up our userdata - this is passed though to the callback where we need the information.
 	_p_encoder_output_port->userdata = (struct MMAL_PORT_USERDATA_T *)&_callback_data;
@@ -1158,24 +1196,53 @@ bool RaspiEncamode::Run()
 	return true;
 }
 
-
-void writeTimeStamp(FILE*p,uint64_t time){
+// This function writes save header for mkvmerge, in milliseconds
+void writeTimeStamp(FILE* p, 
+					const uint64_t & pts)
+{
     if(p==NULL)return;
-    fprintf(p,"%llu\t%i\n",time,timeStamp_GlobalCounter++);
+    fprintf(p,"%llu,%i\n",pts,timeStamp_GlobalCounter++);
+    fflush(p); // pmedina
+}
+
+//  All time in microseconds
+void RaspiEncamode::WriteTimestampCsv(FILE* p,
+									const uint64_t & pts,
+									const int & cntr,
+									const uint64_t & clk)
+{
+    if(p==NULL) return;
+    fprintf(p, "%llu,%i,%lli\n", pts, cntr, clk);
     fflush(p); // pmedina
 }
 
 int64_t RaspiEncamode::GetSteadyUs64()
 {
-	auto steady_dur = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch());
+	auto steady_dur = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::steady_clock::now().time_since_epoch() );
 	return steady_dur.count();
 }
 int64_t RaspiEncamode::GetSteadyMs64()
 {
-	auto steady_dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch());
+	auto steady_dur = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now().time_since_epoch() );
 	return steady_dur.count();
 }
-
+int64_t RaspiEncamode::GetUtcUs()
+{
+	auto clk_dur = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::high_resolution_clock::now().time_since_epoch() );
+	return clk_dur.count();
+}
+int64_t RaspiEncamode::GetUsSinceUtcToday()
+{
+	typedef std::chrono::duration<int, std::ratio<86400>> Days;
+	
+	auto clk = std::chrono::high_resolution_clock::now();
+	Days today = std::chrono::duration_cast<Days>(clk.time_since_epoch());
+	auto time_since_today = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(clk.time_since_epoch() - today);
+	return std::chrono::duration_cast<std::chrono::microseconds>(time_since_today).count();
+}
 int64_t RaspiEncamode::GetMsSinceUtcToday()
 {
 	/* original Replace this C function
@@ -1218,10 +1285,15 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 	MMAL_BUFFER_HEADER_T *new_buffer;
 	static int64_t base_time =  -1;
 	static int64_t last_second = -1;
+	
+	int64_t current_time_us = GetSteadyUs64();
+	int64_t current_time = current_time_us/1000;
+	
+	//int64_t curr_sys_us = GetUsSinceUtcToday();  // disable for efficiency
 
 	// All our segment times based on the receipt of the first encoder callback
 	if (base_time == -1)
-		base_time = GetSteadyMs64();
+		base_time = current_time;
 	
 	// We pass our file handle and other stuff in via the userdata field.
 
@@ -1230,10 +1302,9 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 	if (pData)
 	{
 		int bytes_written = buffer->length;
-		int64_t current_time = GetSteadyMs64();
-
+		
 		assert(pData->file_handle); //vcos_assert(pData->file_handle);
-		if(pData->pconfig->inlineMotionVectors) 
+		if(_conf.inlineMotionVectors) 
 		{
 			//vcos_assert(pData->imv_file_handle);
 			assert(pData->imv_file_handle);
@@ -1318,30 +1389,32 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 				}
 			}
 		}
-		else
+		else  // if(cb_buff)
 		{
-			// For segmented record mode, we need to see if we have exceeded our time/size,
-			// but also since we have inline headers turned on we need to break when we get one to
-			// ensure that the new stream has the header in it. If we break on an I-frame, the
+			// For segmented record mode, we need to see if we have exceeded 
+			// our time/size, but also since we have inline headers turned 
+			// on we need to break when we get one to ensure that the new 
+			// stream has the header in it. If we break on an I-frame, the 
 			// SPS/PPS header is actually in the previous chunk.
-			if ((buffer->flags & MMAL_BUFFER_HEADER_FLAG_CONFIG) &&
-				((pData->pconfig->segmentSize && current_time > base_time + pData->pconfig->segmentSize) ||
-					(pData->pconfig->splitWait && _split_now)))
+			if( (buffer->flags & MMAL_BUFFER_HEADER_FLAG_CONFIG) &&
+				( (_conf.segmentSize && 
+				   current_time > base_time + _conf.segmentSize) ||
+					(_conf.splitWait && _split_now) ) )
 			{
 				FILE *new_handle;
 
 				base_time = current_time;
 
 				_split_now = false;
-				pData->pconfig->segmentNumber++;
+				_seg_num++;
 
 				// Only wrap if we have a wrap point set
-				if (pData->pconfig->segmentWrap && pData->pconfig->segmentNumber > pData->pconfig->segmentWrap)
-				pData->pconfig->segmentNumber = 1;
+				if (_conf.segmentWrap && _seg_num > _conf.segmentWrap)
+				_seg_num = 1;
 
-				if(!pData->pconfig->filename.empty() && pData->pconfig->filename[0] != '-')
+				if(!_conf.filename.empty() && _conf.filename[0] != '-')
 				{
-					 bool suc = open_filename( *(pData->pconfig), pData->pconfig->filename, &new_handle);
+					 bool suc = open_filename( _conf, _conf.filename, _seg_num, &new_handle);
 
 					if(suc && new_handle)
 					{
@@ -1350,9 +1423,9 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 					}
 				}
 
-				if( !pData->pconfig->imv_filename.empty() && pData->pconfig->imv_filename[0] != '-')
+				if( !_conf.imv_filename.empty() && _conf.imv_filename[0] != '-')
 				{
-					bool suc = open_filename(*(pData->pconfig), pData->pconfig->imv_filename, &new_handle);
+					bool suc = open_filename(_conf, _conf.imv_filename, _seg_num, &new_handle);
 
 					if (suc && new_handle)
 					{
@@ -1361,9 +1434,9 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 					}
 				}
 
-				if( !pData->pconfig->pts_filename.empty() && pData->pconfig->pts_filename[0] != '-')
+				if( !_conf.pts_filename.empty() && _conf.pts_filename[0] != '-')
 				{
-					bool suc = open_filename( *(pData->pconfig), pData->pconfig->pts_filename, &new_handle);
+					bool suc = open_filename( _conf, _conf.pts_filename, _seg_num, &new_handle);
 
 					if(suc && new_handle)
 					{
@@ -1378,7 +1451,7 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 				mmal_buffer_header_mem_lock(buffer);
 				if(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CODECSIDEINFO)
 				{
-					if(pData->pconfig->inlineMotionVectors)
+					if(_conf.inlineMotionVectors)
 					{
 						bytes_written = fwrite(buffer->data, 1, buffer->length, pData->imv_file_handle);
 						if(pData->flush_buffers) fflush(pData->imv_file_handle);
@@ -1398,24 +1471,23 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 						fdatasync(fileno(pData->file_handle));
 					}
 
-					if (pData->pconfig->save_pts &&
+					if (_conf.save_pts &&
 							!(buffer->flags & MMAL_BUFFER_HEADER_FLAG_CONFIG) &&
 							buffer->pts != MMAL_TIME_UNKNOWN &&
 							buffer->pts != _lastpts)
 					{
-						int64_t pts;
-						if (_frame == 0)
+						if (_enc_frame_cntr == 0)
 							_startpts = buffer->pts;
 						
+						_enc_frame_steady_us = current_time_us;
 						_lastpts = buffer->pts;
-						pts = buffer->pts - _startpts;
-						// TODO offset to UTC?
-						writeTimeStamp(pData->pts_file_handle,(buffer->pts/1000)+GPUCPUMONOTONICOFFSET);
-						_frame++;
-						(void) pts; //TODO
+						// int64_t pts_dur = buffer->pts - _startpts;  // Calculates duration
+						//writeTimeStamp(pData->pts_file_handle, buffer->pts+GPUCPUMONOTONICOFFSET );
+						
+						WriteTimestampCsv(pData->pts_file_handle, buffer->pts, _enc_frame_cntr, _enc_frame_steady_us);
+						_enc_frame_cntr++;
 					}
 				}
-
 				mmal_buffer_header_mem_unlock(buffer);
 
 				if (bytes_written != (int)buffer->length)
@@ -1440,7 +1512,7 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
 
 	// release buffer back to the pool
 	mmal_buffer_header_release(buffer);
-
+	
 	// and send one back to the port (if still open)
 	if (port->is_enabled)
 	{
@@ -1466,7 +1538,8 @@ void RaspiEncamode::EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_
  */
 void RaspiEncamode::SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-	//  printf("SplitterBufferCallback\n");
+	//  p_err_logger->info("SplitterBufferCallback\n");
+	const int64_t & now = GetSteadyUs64();
 	MMAL_BUFFER_HEADER_T *new_buffer;
 	PORT_USERDATA *pData = (PORT_USERDATA *)port->userdata;
 
@@ -1477,7 +1550,7 @@ void RaspiEncamode::SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER
 
 		/* Write only luma component to get grayscale image: */
 		if( buffer->length && 
-			pData->pconfig->raw_output_fmt == RawOutputFmt::ROF_GRAY )
+			_conf.raw_output_fmt == RawOutputFmt::ROF_GRAY )
 			bytes_to_write = port->format->es->video.width * port->format->es->video.height;
 
 		//vcos_assert(pData->raw_file_handle);
@@ -1485,8 +1558,13 @@ void RaspiEncamode::SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER
 
 		if( bytes_to_write )
 		{
+			_spl_frame_steady_us = now;
 			mmal_buffer_header_mem_lock(buffer);
 			bytes_written = fwrite(buffer->data, 1, bytes_to_write, pData->raw_file_handle);
+			if(_conf.save_raw_pts)
+			{
+				WriteTimestampCsv(pData->raw_pts_file_handle, buffer->pts, _spl_frame_cntr, _spl_frame_steady_us);
+			}
 			mmal_buffer_header_mem_unlock(buffer);
 
 			if (bytes_written != bytes_to_write)
@@ -1494,6 +1572,8 @@ void RaspiEncamode::SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER
 				p_err_logger->error("Failed to write raw buffer data ({} from {})- aborting", bytes_written, bytes_to_write);
 				pData->abort = 1;
 			}
+			_spl_frame_cntr++;
+			
 		}
 	}
 	else
@@ -1609,7 +1689,7 @@ MMAL_STATUS_T RaspiEncamode::CreateCameraComponent(RaspiEncamodeConfig & conf,
 			(uint32_t) 0,				//one_shot_stills
 			(uint32_t) conf.width,		//max_preview_video_w
 			(uint32_t) conf.height,		//max_preview_video_h
-			(uint32_t) 3 + std::max(0, (conf.framerate-30)/10),//num_preview_video_frames
+			(uint32_t) 3 + std::max(0, (conf.framerate-30)/10),//num_preview_video_enc_frame_cntrs
 			(uint32_t) 0,				//stills_capture_circular_buffer_height
 			(uint32_t) 0,				//fast_preview_resume
 			MMAL_PARAM_TIMESTAMP_MODE_RAW_STC	//use_stc_timestamp
@@ -2308,7 +2388,6 @@ int RaspiEncamode::WaitForNextChange()
 	{
 	case WaitMethod::NONE:
 	{
-		p_err_logger->info("no wait method");
 		(void)PauseAndTestAbort(&_callback_data.abort, _conf.timeout);
 		return 0;
 	}

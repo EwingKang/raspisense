@@ -15,8 +15,7 @@ class RaspiEncamode;   // forward declaration
 struct PORT_USERDATA
 {
    FILE *file_handle;                   /// File handle to write buffer data to.
-   RaspiEncamodeConfig *pconfig;   /// pointer to our state in case required in callback
-   RaspiEncamode * pact_obj;			/// Acting object
+   RaspiEncamode * pact_obj;			/// Pointer to our current acting object in callback
    int abort;                           /// Set to 1 in callback if an error occurs to attempt to abort the capture
    char *cb_buff;                       /// Circular buffer
    int   cb_len;                        /// Length of buffer
@@ -33,6 +32,7 @@ struct PORT_USERDATA
    FILE *raw_file_handle;               /// File handle to write raw data to.
    int  flush_buffers;
    FILE *pts_file_handle;               /// File timestamps
+   FILE *raw_pts_file_handle;               /// File timestamps
 };
 
 
@@ -74,10 +74,15 @@ private:
 
 	PORT_USERDATA _callback_data;        /// Used to move data to the encoder callback
 	
+	int _spl_frame_cntr;			// Splitter frame counter
+	int64_t _spl_frame_steady_us;	// Latest splitter callback steady clock us
 	
-	int _frame;			// Frame counter
+	int _enc_frame_cntr;	// Frame counter, only valid with PTS logging
+	int64_t _enc_frame_steady_us;  // Latest encoder callback steady clock us
 	int64_t _startpts;	// Starting GPU (encoder) timestamp
 	int64_t _lastpts;	// Latest GPU (encoder) timestamp
+	
+	int _seg_num;		// current segment number 
 	
 	// State control
 	bool _split_now;	// Split at next possible i-frame if true
@@ -141,8 +146,13 @@ private:
 	
 	
 	// Time
+	static void WriteTimestampCsv(FILE* p, const uint64_t & pts,
+									const int & cntr,
+									const uint64_t & clk);
 	static int64_t GetSteadyUs64();
 	static int64_t GetSteadyMs64();
+	static int64_t GetUtcUs();
+	static int64_t GetUsSinceUtcToday();
 	static int64_t GetMsSinceUtcToday();
 };
 

@@ -1,0 +1,33 @@
+5466 getPVT()
+	packetUBXNAVPVT
+ 	ubxPacket packetCfg
+	5479 checkUbloxInternal(&packetCfg, UBX_CLASS_NAV, UBX_NAV_PVT);
+
+344 SFE_UBLOX_GNSS::checkUbloxInternal(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID)
+	500 SFE_UBLOX_GNSS::checkUbloxSerial(ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID)
+
+	770 SFE_UBLOX_GNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t requestedClass, uint8_t requestedID)
+		packetBuf
+		784 activePacketBuffer = SFE_UBLOX_PACKET_PACKETBUF;
+		890 activePacketBuffer = SFE_UBLOX_PACKET_PACKETAUTO
+		1009 processUBX(incoming, &packetAuto, requestedClass, requestedID);
+	1101 processUBX()
+		1166 currentSentence = NONE;
+		1245 processUBXpacket(incomingUBX);
+
+	1346 SFE_UBLOX_GNSS::processUBXpacket(ubxPacket *msg)
+		1475 parse and stroes to "packetUBXNAVPVT"  
+			-> this updates results in 5480 getPVT(): packetUBXNAVPVT->moduleQueried.moduleQueried1.bits.all;
+		1526 storePacket(msg);
+
+3202 SFE_UBLOX_GNSS::storePacket(ubxPacket *msg)
+
+3279 SFE_UBLOX_GNSS::writeToFileBuffer(uint8_t *theBytes, uint16_t numBytes)
+	memcpy to  ubxFileBuffer
+
+
+To store data
+	1. void SFE_UBLOX_GNSS::logNAVPVT(bool enabled)
+		2. createFileBuffer()  (called in 136:begin())
+	2. setFileBufferSize()
+	2. extractFileBufferData

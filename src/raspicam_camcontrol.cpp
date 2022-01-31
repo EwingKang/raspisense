@@ -34,21 +34,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //#include "interface/vcos/vcos.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h" // support for basic file logging
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 #include "interface/vmcs_host/vc_vchi_gencmd.h"
 #include "interface/mmal/mmal.h"
-#include "interface/mmal/mmal_logging.h"
+//#include "interface/mmal/mmal_logging.h"
 #include "interface/mmal/util/mmal_util.h"
 #include "interface/mmal/util/mmal_util_params.h"
 #include "interface/mmal/util/mmal_default_components.h"
 #include "interface/mmal/util/mmal_connection.h"
 
-//#include "RaspiCamControl.h"
-//#include "RaspiCLI.h"
-//#include "RaspiHelpers.h"
+
 #include "raspicam_camcontrol.hpp"
 
-static std::shared_ptr<spdlog::logger> p_err_logger;
+// TODO: 1151 strncat warning
 
 #define parameter_reset -99999
 
@@ -56,6 +55,7 @@ static std::shared_ptr<spdlog::logger> p_err_logger;
 #define zoom_increment_16P16 (65536UL / 10)
 namespace RaspiCamControl
 {
+static std::shared_ptr<spdlog::logger> p_err_logger = spdlog::stdout_color_mt("RPI_CAMCTRL");
 
 // prototypes
 static int MmalstatusToMsg(const MMAL_STATUS_T & status);
@@ -495,7 +495,7 @@ void SetDefaults(CamConfig *params)
  * @param params Pointer to parameter block to accept settings
  * @return 0 if successful, non-zero if unsuccessful
  */
-int raspicamcontrol_get_all_parameters(MMAL_COMPONENT_T *camera, CamConfig *params)
+int GetAllParameters(MMAL_COMPONENT_T *camera, CamConfig *params)
 {
    vcos_assert(camera);
    vcos_assert(params);
@@ -503,8 +503,9 @@ int raspicamcontrol_get_all_parameters(MMAL_COMPONENT_T *camera, CamConfig *para
    if (!camera || !params)
       return 1;
 
+	int result = 0;
+	result += raspicamcontrol_get_sharpness(camera, &params->sharpness);
    /* TODO : Write these get functions
-      params->sharpness = raspicamcontrol_get_sharpness(camera);
       params->contrast = raspicamcontrol_get_contrast(camera);
       params->brightness = raspicamcontrol_get_brightness(camera);
       params->saturation = raspicamcontrol_get_saturation(camera);
@@ -535,7 +536,7 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
    result += SetSharpness(camera, params->sharpness);
    result += SetContrast(camera, params->contrast);
    result += SetBrightness(camera, params->brightness);
-   result += raspicamcontrol_set_ISO(camera, params->ISO);
+   result += SetISO(camera, params->ISO);
    result += SetVideoStabilisation(camera, params->videoStabilisation);
    result += SetExposureCompensation(camera, params->exposureCompensation);
    result += SetExposureMode(camera, params->exposureMode);
@@ -581,6 +582,32 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
    return result;
 }
 
+
+int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value)
+{
+	if (!camera)
+		return 1;
+	if (!mmal_param_names.find(id))
+		return 1;
+
+   int ret = 0;
+   MMAL_RATIONAL_T v_rat = {0, 100};
+   ret = MmalstatusToMsg(mmal_port_parameter_get_rational(camera->control, id, &v_rat));
+   
+   if(v_rat.num >= -100 || v_rat.num <= 100 && v_rat.den == 100)
+   {
+       (*value) = v_rat.num;
+   }
+   else
+   {
+      p_err_logger->error("Invalid " + mmal_param_names.at(id) + " value");
+      ret = 1;
+   }
+
+   return ret;
+}
+
+
 /**
  * Adjust the saturation level for images
  * @param camera Pointer to camera component
@@ -607,6 +634,29 @@ int SetSaturation(MMAL_COMPONENT_T *camera, int saturation)
 
    return ret;
 }
+int GetSaturation() MMAL_COMPONENT_T *camera, int *saturation)
+{
+//    int ret = 0;
+// 
+//    if (!camera)
+//       return 1;
+// 
+//    MMAL_RATIONAL_T value = {0, 100};
+//    ret = MmalstatusToMsg(mmal_port_parameter_get_rational(camera->control, MMAL_PARAMETER_SATURATION, &value));
+//    
+//    if(value.num >= -100 || value.num <= 100 && value.den == 100)
+//    {
+//        (*saturation) = value.num;
+//    }
+//    else
+//    {
+//       p_err_logger->error("Invalid saturation value");
+//       ret = 1;
+//    }
+// 
+//    return ret;
+	return GetRational(camera, MMAL_PARAMETER_SATURATION, saturation);
+}
 
 /**
  * Set the sharpness of the image
@@ -632,6 +682,10 @@ int SetSharpness(MMAL_COMPONENT_T *camera, int sharpness)
    }
 
    return ret;
+}
+int GetSharpness(MMAL_COMPONENT_T *camera, int *sharpness)
+{
+   return GetRational(camera, MMAL_PARAMETER_SHARPNESS, sharpness);
 }
 
 /**
@@ -660,6 +714,12 @@ int SetContrast(MMAL_COMPONENT_T *camera, int contrast)
 
    return ret;
 }
+int GetContrast(MMAL_COMPONENT_T *camera, int *contrast)
+{
+   return GetRational(camera, MMAL_PARAMETER_CONTRAST, contrast);
+}
+
+
 
 /**
  * Adjust the brightness level for images
@@ -687,6 +747,10 @@ int SetBrightness(MMAL_COMPONENT_T *camera, int brightness)
 
    return ret;
 }
+int GetBrightness(MMAL_COMPONENT_T *camera, int *brightness)
+{
+   return GetRational(camera, MMAL_PARAMETER_BRIGHTNESS, brightness);
+}
 
 /**
  * Adjust the ISO used for images
@@ -694,7 +758,7 @@ int SetBrightness(MMAL_COMPONENT_T *camera, int brightness)
  * @param ISO Value to set TODO :
  * @return 0 if successful, non-zero if any parameters out of range
  */
-int raspicamcontrol_set_ISO(MMAL_COMPONENT_T *camera, int ISO)
+int SetISO(MMAL_COMPONENT_T *camera, int ISO)
 {
    if (!camera)
       return 1;
