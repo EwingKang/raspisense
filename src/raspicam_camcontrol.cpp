@@ -87,13 +87,18 @@ struct MmalCamParamTrait<MMAL_PARAMETER_FLICKERAVOID_T> {
 	static const char* name;
 };
 const char* MmalCamParamTrait<MMAL_PARAMETER_FLICKERAVOID_T>::name = "Flicker avoid";
-//
 template <>
 struct MmalCamParamTrait<MMAL_PARAMETER_AWBMODE_T> {
 	static const int id = MMAL_PARAMETER_AWB_MODE;
 	static const char* name;
 };
 const char* MmalCamParamTrait<MMAL_PARAMETER_AWBMODE_T>::name = "AWB mode";
+template <>
+struct MmalCamParamTrait<MMAL_PARAMETER_IMAGEFX_T> {
+	static const int id = MMAL_PARAMETER_IMAGE_EFFECT;
+	static const char* name;
+};
+const char* MmalCamParamTrait<MMAL_PARAMETER_IMAGEFX_T>::name = "Image FX";
 
 // Following type trait deduced "enclosing type" from actual "mmal parameter type"
 // The types are defined accroding to definition in  mmal_parameters_camera.h
@@ -116,6 +121,10 @@ struct MmalEnumBase<MMAL_PARAM_FLICKERAVOID_T> {
 template <>
 struct MmalEnumBase<MMAL_PARAM_AWBMODE_T> {
 	typedef MMAL_PARAMETER_AWBMODE_T basetype;
+};
+template <>
+struct MmalEnumBase<MMAL_PARAM_IMAGEFX_T> {
+	typedef MMAL_PARAMETER_IMAGEFX_T basetype;
 };
 
 
@@ -1129,27 +1138,7 @@ int SetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T imageFX)
 }
 int GetImageFX(MMAL_COMPONENT_T* camera, MMAL_PARAM_IMAGEFX_T* imageFX )
 {
-	if (!camera)
-		return 1;
-	MMAL_PARAMETER_IMAGEFX_T imgFX = 
-	{
-		{
-			MMAL_PARAMETER_IMAGE_EFFECT,
-			sizeof(imgFX)
-		},
-		MMAL_PARAM_IMAGEFX_MAX
-	};
-	
-	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &imgFX.hdr);
-	if( get_ret == 0)
-	{
-		(*imageFX) = imgFX.value;
-	}
-	else
-	{
-		p_err_logger->error("Unable to get image effect mode setting");
-	}
-	return MmalstatusToMsg(get_ret);
+	return GetValuedParam(camera, imageFX);
 }
 
 

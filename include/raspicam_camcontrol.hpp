@@ -33,68 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string>
 #include "mmal.h"
 
-/* Various parameters
- *
- * Exposure Mode
- *          MMAL_PARAM_EXPOSUREMODE_OFF,
-            MMAL_PARAM_EXPOSUREMODE_AUTO,
-            MMAL_PARAM_EXPOSUREMODE_NIGHT,
-            MMAL_PARAM_EXPOSUREMODE_NIGHTPREVIEW,
-            MMAL_PARAM_EXPOSUREMODE_BACKLIGHT,
-            MMAL_PARAM_EXPOSUREMODE_SPOTLIGHT,
-            MMAL_PARAM_EXPOSUREMODE_SPORTS,
-            MMAL_PARAM_EXPOSUREMODE_SNOW,
-            MMAL_PARAM_EXPOSUREMODE_BEACH,
-            MMAL_PARAM_EXPOSUREMODE_VERYLONG,
-            MMAL_PARAM_EXPOSUREMODE_FIXEDFPS,
-            MMAL_PARAM_EXPOSUREMODE_ANTISHAKE,
-            MMAL_PARAM_EXPOSUREMODE_FIREWORKS,
- *
- * Flicker Avoid Mode
- *          MMAL_PARAM_FLICKERAVOID_OFF,
-            MMAL_PARAM_FLICKERAVOID_AUTO,
-            MMAL_PARAM_FLICKERAVOID_50HZ,
-            MMAL_PARAM_FLICKERAVOID_60HZ,
- *
- * AWB Mode
- *          MMAL_PARAM_AWBMODE_OFF,
-            MMAL_PARAM_AWBMODE_AUTO,
-            MMAL_PARAM_AWBMODE_SUNLIGHT,
-            MMAL_PARAM_AWBMODE_CLOUDY,
-            MMAL_PARAM_AWBMODE_SHADE,
-            MMAL_PARAM_AWBMODE_TUNGSTEN,
-            MMAL_PARAM_AWBMODE_FLUORESCENT,
-            MMAL_PARAM_AWBMODE_INCANDESCENT,
-            MMAL_PARAM_AWBMODE_FLASH,
-            MMAL_PARAM_AWBMODE_HORIZON,
- *
- * Image FX
-            MMAL_PARAM_IMAGEFX_NONE,
-            MMAL_PARAM_IMAGEFX_NEGATIVE,
-            MMAL_PARAM_IMAGEFX_SOLARIZE,
-            MMAL_PARAM_IMAGEFX_POSTERIZE,
-            MMAL_PARAM_IMAGEFX_WHITEBOARD,
-            MMAL_PARAM_IMAGEFX_BLACKBOARD,
-            MMAL_PARAM_IMAGEFX_SKETCH,
-            MMAL_PARAM_IMAGEFX_DENOISE,
-            MMAL_PARAM_IMAGEFX_EMBOSS,
-            MMAL_PARAM_IMAGEFX_OILPAINT,
-            MMAL_PARAM_IMAGEFX_HATCH,
-            MMAL_PARAM_IMAGEFX_GPEN,
-            MMAL_PARAM_IMAGEFX_PASTEL,
-            MMAL_PARAM_IMAGEFX_WATERCOLOUR,
-            MMAL_PARAM_IMAGEFX_FILM,
-            MMAL_PARAM_IMAGEFX_BLUR,
-            MMAL_PARAM_IMAGEFX_SATURATION,
-            MMAL_PARAM_IMAGEFX_COLOURSWAP,
-            MMAL_PARAM_IMAGEFX_WASHEDOUT,
-            MMAL_PARAM_IMAGEFX_POSTERISE,
-            MMAL_PARAM_IMAGEFX_COLOURPOINT,
-            MMAL_PARAM_IMAGEFX_COLOURBALANCE,
-            MMAL_PARAM_IMAGEFX_CARTOON,
-
- */
-
 /// Annotate bitmask options
 /// Supplied by user on command line
 #define ANNOTATE_USER_TEXT          1
@@ -113,15 +51,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANNOTATE_FRAME_NUMBER       512
 #define ANNOTATE_BLACK_BACKGROUND   1024
 
-
 /*undefined typedef struct mmal_param_thumbnail_config_s
 {
    int enable;
    int width,height;
    int quality;
 } MMAL_PARAM_THUMBNAIL_CONFIG_T;*/
-
-
 
 
 namespace RaspiCamControl
@@ -201,7 +136,6 @@ namespace RaspiCamControl
 	{"antishake",     MMAL_PARAM_EXPOSUREMODE_ANTISHAKE},
 	{"fireworks",     MMAL_PARAM_EXPOSUREMODE_FIREWORKS}
 	};
-
 
 	/// Structure to cross reference flicker avoid strings against the MMAL parameter equivalent
 	static std::unordered_map<std::string, MMAL_PARAM_FLICKERAVOID_T> flicker_avoid_map =
@@ -372,7 +306,6 @@ namespace RaspiCamControl
 	int GetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int GetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	
-
 	
 /* TBD
 int raspicamcontrol_cycle_test(MMAL_COMPONENT_T *camera);
