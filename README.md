@@ -19,5 +19,7 @@ ffmpeg -r 30 -i video.h264 -vcodec copy video.mp4
 
 ```
 # TODO
-- [ ] README
-- [ ] ???
+- [ ] Finish secondary TODOs in raspicam_camcontrol.cpp/ hpp
+- [ ] Isolate raspicam CPP to a stand alone project
+- [ ] (Maybe?) get a better name then raspi_encamode. Call it CppRaspiVid maybe?  
+
