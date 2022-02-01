@@ -114,12 +114,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ANNOTATE_BLACK_BACKGROUND   1024
 
 
-/*Replaced typedef struct mmal_param_colourfx_s
-{
-   int enable;       /// Turn colourFX on or off
-   int u,v;          /// U and V to use
-} MMAL_PARAMETER_COLOURFX_T;*/
-
 /*undefined typedef struct mmal_param_thumbnail_config_s
 {
    int enable;
@@ -275,13 +269,13 @@ namespace RaspiCamControl
 	{"high",          MMAL_PARAMETER_DRC_STRENGTH_HIGH}
 	};
 	
-	static std::unordered_map<uint32_t id, std::string> mmal_param_names = 
+	static std::unordered_map<uint32_t, std::string> mmal_param_names = 
 	{
 		{MMAL_PARAMETER_SATURATION, "saturation"},
 		{MMAL_PARAMETER_SHARPNESS,"sharpness"},
 		{MMAL_PARAMETER_CONTRAST,"contrast"},
 		{MMAL_PARAMETER_BRIGHTNESS,"brightness"}
-	}
+	};
 	
 	void BuildRevMap(); // Note: this must be called before the usage of parameter dump
 	
@@ -314,7 +308,7 @@ namespace RaspiCamControl
 	int SetVideoStabilisation(MMAL_COMPONENT_T *camera, int vstabilisation);
 	int SetExposureCompensation(MMAL_COMPONENT_T *camera, int exp_comp);
 	int SetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode);
-	int SetFlicker_avoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode);
+	int SetFlickerAvoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode);
 	int SetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T awb_mode);
 	int SetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain);
 	int SetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T imageFX);
@@ -332,22 +326,32 @@ namespace RaspiCamControl
 	int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	
+	// Interface to mmal_util_params.h
+	// Return 0 means success
+	int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int* value);
+	int GetUint32(MMAL_COMPONENT_T *camera, uint32_t id, uint32_t *value);
+	int GetInt32(MMAL_COMPONENT_T *camera, uint32_t id, int32_t *value);
+	int GetBoolean(MMAL_COMPONENT_T *camera, uint32_t id, bool *value);
+	
 	// Individual get functions
-	int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value);
-	int GetSaturation(MMAL_COMPONENT_T *camera, int *saturation);
-	int GetSharpness(MMAL_COMPONENT_T *camera, int sharpness);
-	int GetContrast(MMAL_COMPONENT_T *camera, int contrast);
-	int GetBrightness(MMAL_COMPONENT_T *camera, int brightness);
-	int GetISO(MMAL_COMPONENT_T *camera, int ISO);
-	int GetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T mode);
-	int GetVideoStabilisation(MMAL_COMPONENT_T *camera, int vstabilisation);
-	int GetExposureCompensation(MMAL_COMPONENT_T *camera, int exp_comp);
-	int GetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode);
-	int GetFlicker_avoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode);
-	int GetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T awb_mode);
+	// Return: 0 means success
+	int GetSaturation(MMAL_COMPONENT_T *camera, int* saturation);
+	int GetSharpness(MMAL_COMPONENT_T *camera, int* sharpness);
+	int GetContrast(MMAL_COMPONENT_T *camera, int* contrast);
+	int GetBrightness(MMAL_COMPONENT_T *camera, int* brightness);
+	int GetISO(MMAL_COMPONENT_T *camera, int* ISO);
+	int GetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T* m_mode);
+	int GetVideoStabilisation(MMAL_COMPONENT_T *camera, int* vstabilisation);
+	int GetExposureCompensation(MMAL_COMPONENT_T *camera, int* exp_comp);
+	int GetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T* mode);
+	int GetFlickerAvoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T* mode);
+	int GetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T* awb_mode);
+	int GetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T* imageFX);
+	int GetColourFX(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_COLOURFX_T* colourFX);
+	
+	
+	/* WIP : Write these get functions*/
 	int GetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain);
-	int GetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T imageFX);
-	int GetColourFX(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *colourFX);
 	int GetRotation(MMAL_COMPONENT_T *camera, int rotation);
 	int GetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip);
 	int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect);
@@ -360,31 +364,16 @@ namespace RaspiCamControl
 									const unsigned int justify, const unsigned int x, const unsigned int y);
 	int GetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int GetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
-} // end of namespace RaspiCamControl
+	
 
-// undefined
-//void raspicamcontrol_check_configuration(int min_gpu_mem);
-
-// TBD
-//int raspicamcontrol_cycle_test(MMAL_COMPONENT_T *camera);
-
-/* Undefined
-//Individual getting functions
-
-int raspicamcontrol_get_ISO(MMAL_COMPONENT_T *camera);
-MMAL_PARAM_EXPOSUREMETERINGMODE_T raspicamcontrol_get_metering_mode(MMAL_COMPONENT_T *camera);
-int raspicamcontrol_get_video_stabilisation(MMAL_COMPONENT_T *camera);
-int raspicamcontrol_get_exposure_compensation(MMAL_COMPONENT_T *camera);
+	
+/* TBD
+int raspicamcontrol_cycle_test(MMAL_COMPONENT_T *camera);
+void raspicamcontrol_check_configuration(int min_gpu_mem);
 MMAL_PARAM_THUMBNAIL_CONFIG_T raspicamcontrol_get_thumbnail_parameters(MMAL_COMPONENT_T *camera);
-MMAL_PARAM_EXPOSUREMODE_T raspicamcontrol_get_exposure_mode(MMAL_COMPONENT_T *camera);
-MMAL_PARAM_FLICKERAVOID_T raspicamcontrol_get_flicker_avoid_mode(MMAL_COMPONENT_T *camera);
-MMAL_PARAM_AWBMODE_T raspicamcontrol_get_awb_mode(MMAL_COMPONENT_T *camera);
-MMAL_PARAM_IMAGEFX_T raspicamcontrol_get_imageFX(MMAL_COMPONENT_T *camera);
-MMAL_PARAMETER_COLOURFX_T raspicamcontrol_get_colourFX(MMAL_COMPONENT_T *camera);*/
-
-/** Default camera callback function
-  */
+*/
 
 
+} // end of namespace RaspiCamControl
 
 #endif /* RASPICAMCONTROL_H_ */

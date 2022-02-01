@@ -41,11 +41,12 @@ class RaspiEncamode
 public:
 	bool Init(const RaspiEncamodeConfig & conf);
 	
-// 	// Callbacks for MMAL
+	bool Run();
+	
+ 	// Callbacks for MMAL, not for user use
 	void EncoderBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
 	void SplitterBufferCallback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-	
-	bool Run();
+
 private:
 	RaspiEncamodeConfig _conf;
 	

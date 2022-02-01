@@ -504,22 +504,25 @@ int GetAllParameters(MMAL_COMPONENT_T *camera, CamConfig *params)
       return 1;
 
 	int result = 0;
-	result += raspicamcontrol_get_sharpness(camera, &params->sharpness);
-   /* TODO : Write these get functions
-      params->contrast = raspicamcontrol_get_contrast(camera);
-      params->brightness = raspicamcontrol_get_brightness(camera);
-      params->saturation = raspicamcontrol_get_saturation(camera);
-      params->ISO = raspicamcontrol_get_ISO(camera);
-      params->videoStabilisation = raspicamcontrol_get_video_stabilisation(camera);
-      params->exposureCompensation = raspicamcontrol_get_exposure_compensation(camera);
-      params->exposureMode = raspicamcontrol_get_exposure_mode(camera);
-      params->flickerAvoidMode = raspicamcontrol_get_flicker_avoid_mode(camera);
-      params->awbMode = raspicamcontrol_get_awb_mode(camera);
-      params->imageEffect = raspicamcontrol_get_image_effect(camera);
-      params->colourEffects = raspicamcontrol_get_colour_effect(camera);
-      params->thumbnailConfig = raspicamcontrol_get_thumbnail_config(camera);
-   */
-   return 0;
+	result += GetSharpness(camera, &params->sharpness);
+	result += GetContrast(camera, &params->contrast);
+	result += GetBrightness(camera, &params->brightness);
+	result += GetSaturation(camera, &params->saturation);
+	result += GetISO(camera, &params->ISO);
+	result += GetMeteringMode(camera, &params->exposureMeterMode);
+	result += GetVideoStabilisation(camera, &params->videoStabilisation);
+	result += GetExposureCompensation(camera, &params->exposureCompensation);
+	result += GetExposureMode(camera, &params->exposureMode);
+	result += GetFlickerAvoidMode(camera, &params->flickerAvoidMode);
+	result += GetAwbMode(camera, &params->awbMode);
+	result += GetImageFX(camera, &params->imageEffect);
+	result += GetColourFX(camera, &params->colourEffects);
+	// TODO not implemented
+	// result += GetThumbnailConfig(camera, &params->thumbnailConfig);
+	
+	if( result )
+		p_err_logger->error("Errors while retrieveing parameters from MMAL: {}", result);
+   return result;
 }
 
 /**
@@ -540,7 +543,7 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
    result += SetVideoStabilisation(camera, params->videoStabilisation);
    result += SetExposureCompensation(camera, params->exposureCompensation);
    result += SetExposureMode(camera, params->exposureMode);
-   result += SetFlicker_avoidMode(camera, params->flickerAvoidMode);
+   result += SetFlickerAvoidMode(camera, params->flickerAvoidMode);
    result += SetMeteringMode(camera, params->exposureMeterMode);
    result += SetAwbMode(camera, params->awbMode);
    result += SetAwbGains(camera, params->awb_gains_r, params->awb_gains_b);
@@ -585,26 +588,94 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
 
 int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value)
 {
-	if (!camera)
+	if( !camera )
 		return 1;
-	if (!mmal_param_names.find(id))
+	if( mmal_param_names.find(id) == mmal_param_names.end() )
 		return 1;
 
-   int ret = 0;
-   MMAL_RATIONAL_T v_rat = {0, 100};
-   ret = MmalstatusToMsg(mmal_port_parameter_get_rational(camera->control, id, &v_rat));
+	int ret = 0;
+	MMAL_RATIONAL_T v_rat = {0, 100};
+	ret = MmalstatusToMsg(mmal_port_parameter_get_rational(camera->control, id, &v_rat));
    
-   if(v_rat.num >= -100 || v_rat.num <= 100 && v_rat.den == 100)
-   {
-       (*value) = v_rat.num;
-   }
-   else
-   {
-      p_err_logger->error("Invalid " + mmal_param_names.at(id) + " value");
-      ret = 1;
-   }
+	if( ret == 0 )
+	{
+		(*value) = v_rat.num;
+	}
+	else
+	{
+		p_err_logger->error("Invalid param " + mmal_param_names.at(id) + " for rational value");
+		ret = 1;
+	}
+	return ret;
+}
 
-   return ret;
+int GetUint32(MMAL_COMPONENT_T *camera, uint32_t id, uint32_t *value)
+{
+	if( !camera )
+		return 1;
+	if( mmal_param_names.find(id) == mmal_param_names.end() )
+		return 1;
+
+	int ret = 0;
+	uint32_t v_uint32 = 0;
+	ret = MmalstatusToMsg(mmal_port_parameter_get_uint32(camera->control, id, &v_uint32));
+   
+	if( ret == 0 )
+	{
+		(*value) = v_uint32;
+	}
+	else
+	{
+		p_err_logger->error("Invalid param " + mmal_param_names.at(id) + " for uint32 value");
+		ret = 1;
+	}
+	return ret;
+}
+
+int GetInt32(MMAL_COMPONENT_T *camera, uint32_t id, int32_t *value)
+{
+	if( !camera )
+		return 1;
+	if( mmal_param_names.find(id) == mmal_param_names.end() )
+		return 1;
+
+	int ret = 0;
+	int32_t v_int32 = 0;
+	ret = MmalstatusToMsg(mmal_port_parameter_get_int32(camera->control, id, &v_int32));
+   
+	if( ret == 0 )
+	{
+		(*value) = v_int32;
+	}
+	else
+	{
+		p_err_logger->error("Invalid param " + mmal_param_names.at(id) + " for int32 value");
+		ret = 1;
+	}
+	return ret;
+}
+
+int GetBoolean(MMAL_COMPONENT_T *camera, uint32_t id, bool *value)
+{
+	if( !camera )
+		return 1;
+	if( mmal_param_names.find(id) == mmal_param_names.end() )
+		return 1;
+
+	int ret = 0;
+	MMAL_BOOL_T v_bool = 0;
+	ret = MmalstatusToMsg(mmal_port_parameter_get_boolean(camera->control, id, &v_bool));
+   
+	if( ret == 0 )
+	{
+		(*value) = v_bool;
+	}
+	else
+	{
+		p_err_logger->error("Invalid param " + mmal_param_names.at(id) + " for boolean value");
+		ret = 1;
+	}
+	return ret;
 }
 
 
@@ -634,27 +705,8 @@ int SetSaturation(MMAL_COMPONENT_T *camera, int saturation)
 
    return ret;
 }
-int GetSaturation() MMAL_COMPONENT_T *camera, int *saturation)
+int GetSaturation( MMAL_COMPONENT_T *camera, int *saturation)
 {
-//    int ret = 0;
-// 
-//    if (!camera)
-//       return 1;
-// 
-//    MMAL_RATIONAL_T value = {0, 100};
-//    ret = MmalstatusToMsg(mmal_port_parameter_get_rational(camera->control, MMAL_PARAMETER_SATURATION, &value));
-//    
-//    if(value.num >= -100 || value.num <= 100 && value.den == 100)
-//    {
-//        (*saturation) = value.num;
-//    }
-//    else
-//    {
-//       p_err_logger->error("Invalid saturation value");
-//       ret = 1;
-//    }
-// 
-//    return ret;
 	return GetRational(camera, MMAL_PARAMETER_SATURATION, saturation);
 }
 
@@ -765,6 +817,12 @@ int SetISO(MMAL_COMPONENT_T *camera, int ISO)
 
    return MmalstatusToMsg(mmal_port_parameter_set_uint32(camera->control, MMAL_PARAMETER_ISO, ISO));
 }
+int GetISO(MMAL_COMPONENT_T *camera, int* ISO)
+{
+   if (!camera)
+      return 1;
+   return GetUint32(camera, MMAL_PARAMETER_ISO, (uint32_t*)ISO);
+}
 
 /**
  * Adjust the metering mode for images
@@ -787,6 +845,31 @@ int SetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &meter_mode.hdr));
 }
 
+int GetMeteringMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T* m_mode )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_EXPOSUREMETERINGMODE_T meter_mode = 
+	{
+		{
+			MMAL_PARAMETER_EXP_METERING_MODE,
+			sizeof(meter_mode)
+		},
+		MMAL_PARAM_EXPOSUREMETERINGMODE_MAX
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &meter_mode.hdr);
+	if( get_ret == 0)
+	{
+		(*m_mode) = meter_mode.value;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get exposure metering setting");
+	}
+	return MmalstatusToMsg(get_ret);
+}
+
 
 /**
  * Set the video stabilisation flag. Only used in video mode
@@ -800,6 +883,12 @@ int SetVideoStabilisation(MMAL_COMPONENT_T *camera, int vstabilisation)
       return 1;
 
    return MmalstatusToMsg(mmal_port_parameter_set_boolean(camera->control, MMAL_PARAMETER_VIDEO_STABILISATION, vstabilisation));
+}
+int GetVideoStabilisation(MMAL_COMPONENT_T *camera, int* vstabilisation)
+{
+   if (!camera)
+      return 1;
+   return GetBoolean(camera, MMAL_PARAMETER_VIDEO_STABILISATION, (bool*)vstabilisation);
 }
 
 /**
@@ -815,7 +904,12 @@ int SetExposureCompensation(MMAL_COMPONENT_T *camera, int exp_comp)
 
    return MmalstatusToMsg(mmal_port_parameter_set_int32(camera->control, MMAL_PARAMETER_EXPOSURE_COMP, exp_comp));
 }
-
+int GetExposureCompensation(MMAL_COMPONENT_T *camera, int * exp_comp)
+{
+   if (!camera)
+      return 1;
+   return GetInt32(camera, MMAL_PARAMETER_EXPOSURE_COMP, exp_comp);
+}
 
 /**
  * Set exposure mode for images
@@ -846,6 +940,30 @@ int SetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode)
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &exp_mode.hdr));
 }
+int GetExposureMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_EXPOSUREMODE_T* e_mode )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_EXPOSUREMODE_T exp_mode = 
+	{
+		{
+			MMAL_PARAMETER_EXPOSURE_MODE,
+			sizeof(exp_mode)
+		},
+		MMAL_PARAM_EXPOSUREMODE_MAX
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &exp_mode.hdr);
+	if( get_ret == 0)
+	{
+		(*e_mode) = exp_mode.value;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get exposure setting");
+	}
+	return MmalstatusToMsg(get_ret);
+}
 
 
 /**
@@ -859,7 +977,7 @@ int SetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode)
  *
  * @return 0 if successful, non-zero if any parameters out of range
  */
-int SetFlicker_avoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode)
+int SetFlickerAvoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode)
 {
    MMAL_PARAMETER_FLICKERAVOID_T fl_mode = {{MMAL_PARAMETER_FLICKER_AVOID,sizeof(fl_mode)}, mode};
 
@@ -868,7 +986,30 @@ int SetFlicker_avoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mod
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &fl_mode.hdr));
 }
-
+int GetFlickerAvoidMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_FLICKERAVOID_T* e_mode )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_FLICKERAVOID_T fl_mode = 
+	{
+		{
+			MMAL_PARAMETER_FLICKER_AVOID,
+			sizeof(fl_mode)
+		},
+		MMAL_PARAM_FLICKERAVOID_MAX
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &fl_mode.hdr);
+	if( get_ret == 0)
+	{
+		(*e_mode) = fl_mode.value;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get flicker avoid mode setting");
+	}
+	return MmalstatusToMsg(get_ret);
+}
 
 /**
  * Set the aWB (auto white balance) mode for images
@@ -894,6 +1035,30 @@ int SetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T awb_mode)
       return 1;
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &param.hdr));
+}
+int GetAwbMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_AWBMODE_T* awb_mode )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_AWBMODE_T param = 
+	{
+		{
+			MMAL_PARAMETER_AWB_MODE,
+			sizeof(param)
+		},
+		MMAL_PARAM_AWBMODE_MAX
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &param.hdr);
+	if( get_ret == 0)
+	{
+		(*awb_mode) = param.value;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get AWB mode setting");
+	}
+	return MmalstatusToMsg(get_ret);
 }
 
 int SetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain)
@@ -950,12 +1115,31 @@ int SetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T imageFX)
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &imgFX.hdr));
 }
+int GetImageFX(MMAL_COMPONENT_T* camera, MMAL_PARAM_IMAGEFX_T* imageFX )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_IMAGEFX_T imgFX = 
+	{
+		{
+			MMAL_PARAMETER_IMAGE_EFFECT,
+			sizeof(imgFX)
+		},
+		MMAL_PARAM_IMAGEFX_MAX
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &imgFX.hdr);
+	if( get_ret == 0)
+	{
+		(*imageFX) = imgFX.value;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get image effect mode setting");
+	}
+	return MmalstatusToMsg(get_ret);
+}
 
-/* TODO :what to do with the image effects parameters?
-   MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {{MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS,sizeof(imfx_param)},
-                              imageFX, 0, {0}};
-mmal_port_parameter_set(camera->control, &imfx_param.hdr);
-                             */
 
 /**
  * Set the colour effect  for images (Set UV component)
@@ -963,7 +1147,6 @@ mmal_port_parameter_set(camera->control, &imfx_param.hdr);
  * @param colourFX  Contains enable state and U and V numbers to set (e.g. 128,128 = Black and white)
  * @return 0 if successful, non-zero if any parameters out of range
  */
-// TODO: MMAL_PARAM_COLOURFX_T->MMAL_PARAMETER_COLOURFX_T only
 int SetColourFX(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *colourFX)
 {
    MMAL_PARAMETER_COLOURFX_T colfx = {{MMAL_PARAMETER_COLOUR_EFFECT,sizeof(colfx)}, 0, 0, 0};
@@ -976,9 +1159,33 @@ int SetColourFX(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *colou
    colfx.v = colourFX->v;
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &colfx.hdr));
-
 }
-
+int GetColourFX(MMAL_COMPONENT_T* camera, MMAL_PARAMETER_COLOURFX_T* colourFX )
+{
+	if (!camera)
+		return 1;
+	MMAL_PARAMETER_COLOURFX_T colfx = 
+	{
+		{
+			MMAL_PARAMETER_COLOUR_EFFECT,
+			sizeof(colfx)
+		},
+		0, 0, 0
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &colfx.hdr);
+	if( get_ret == 0)
+	{
+		colourFX->enable = colfx.enable;
+		colourFX->u = colfx.u;
+		colourFX->v = colfx.v;
+	}
+	else
+	{
+		p_err_logger->error("Unable to get color effect settings");
+	}
+	return MmalstatusToMsg(get_ret);
+}
 
 /**
  * Set the rotation of the image

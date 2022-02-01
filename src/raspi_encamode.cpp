@@ -1,5 +1,16 @@
-/*
- * TODO Modifies this
+/****************************************************
+Author: Ewing Kang
+Contact: f039281310@yahoo.com.tw
+Note: 
+This is a CPP adaptation of the RaspiVid.c originally 
+produced by the Raspberry PI 4 team. The library aims
+to privide video/ streaming with accurate hardware timestamp 
+capability. For original information, please check the original
+source section below.
+The preview function is not available ATM.
+*****************************************************
+         Original copywrite information
+
 Copyright (c) 2018, Raspberry Pi (Trading) Ltd.
 Copyright (c) 2013, Broadcom Europe Ltd.
 Copyright (c) 2013, James Hughes
@@ -26,9 +37,8 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
 ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 
-/**
+*****************************************************
  * \file RaspiVid.c
  * Command line program to capture a camera video stream and encode it to file.
  * Also optionally display a preview/viewfinder of current camera input.
@@ -1052,7 +1062,7 @@ bool RaspiEncamode::EnablePort()
 
 	// Enable the encoder output port and tell it its callback function
 	MMAL_STATUS_T status = mmal_port_enable(
-		_p_encoder_output_port,EncoderBufferCallbackWrapper);
+		_p_encoder_output_port, EncoderBufferCallbackWrapper);
 		//std::bind( &RaspiEncamode::EncoderBufferCallback, 
 		//		   this, 
 		//		   std::placeholders::_2, std::placeholders::_3) );

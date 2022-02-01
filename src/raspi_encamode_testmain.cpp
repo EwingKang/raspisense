@@ -802,6 +802,7 @@ int main(int argc, const char **argv)
 	}
 	if (rec_config.timeout == -1) rec_config.timeout = 5000;
 	
+	// Main executing object
 	RaspiEncamode vid_cam;
 	
 	if( !vid_cam.Init(rec_config) ) 
