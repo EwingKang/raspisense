@@ -204,7 +204,6 @@ namespace RaspiCamControl
 
 
 	/// Structure to cross reference flicker avoid strings against the MMAL parameter equivalent
-
 	static std::unordered_map<std::string, MMAL_PARAM_FLICKERAVOID_T> flicker_avoid_map =
 	{
 	{"off",           MMAL_PARAM_FLICKERAVOID_OFF},
@@ -281,6 +280,7 @@ namespace RaspiCamControl
 	
 	
 	
+	
 	/** Default camera callback function
 	* Handles the --settings
 	* @param port
@@ -332,6 +332,13 @@ namespace RaspiCamControl
 	int GetUint32(MMAL_COMPONENT_T *camera, uint32_t id, uint32_t *value);
 	int GetInt32(MMAL_COMPONENT_T *camera, uint32_t id, int32_t *value);
 	int GetBoolean(MMAL_COMPONENT_T *camera, uint32_t id, bool *value);
+	
+	// For the typedefs in the mmal_parameters_camera.h
+	template <class MMAL_IFTYPE>
+	int GetEnumedParam(MMAL_COMPONENT_T *camera, MMAL_IFTYPE* param);
+	// This function retrives "value" field in the structure
+	template <typename MMAL_CAMPARAM_TYPE>
+	int GetValuedParam(MMAL_COMPONENT_T *camera, MMAL_CAMPARAM_TYPE* param);
 	
 	// Individual get functions
 	// Return: 0 means success

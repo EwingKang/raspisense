@@ -60,7 +60,66 @@ static std::shared_ptr<spdlog::logger> p_err_logger = spdlog::stdout_color_mt("R
 // prototypes
 static int MmalstatusToMsg(const MMAL_STATUS_T & status);
 	
-	
+
+// ===== Type trait =====
+// A system for generic use of getting parameters
+template <class T>
+struct MmalCamParamTrait {
+	static const int id;
+	static const char* name;
+};
+// Specializations
+template <>
+struct MmalCamParamTrait<MMAL_PARAMETER_EXPOSUREMETERINGMODE_T> {
+	static const int id = MMAL_PARAMETER_EXP_METERING_MODE;
+	static const char* name;
+};
+const char* MmalCamParamTrait<MMAL_PARAMETER_EXPOSUREMETERINGMODE_T>::name = "Exposure metering";
+template <>
+struct MmalCamParamTrait<MMAL_PARAMETER_EXPOSUREMODE_T> {
+	static const int id = MMAL_PARAMETER_EXPOSURE_MODE;
+	static const char* name;
+};
+const char* MmalCamParamTrait<MMAL_PARAMETER_EXPOSUREMODE_T>::name = "Exposure mode";
+template <>
+struct MmalCamParamTrait<MMAL_PARAMETER_FLICKERAVOID_T> {
+	static const int id = MMAL_PARAMETER_FLICKER_AVOID;
+	static const char* name;
+};
+const char* MmalCamParamTrait<MMAL_PARAMETER_FLICKERAVOID_T>::name = "Flicker avoid";
+//
+template <>
+struct MmalCamParamTrait<MMAL_PARAMETER_AWBMODE_T> {
+	static const int id = MMAL_PARAMETER_AWB_MODE;
+	static const char* name;
+};
+const char* MmalCamParamTrait<MMAL_PARAMETER_AWBMODE_T>::name = "AWB mode";
+
+// Following type trait deduced "enclosing type" from actual "mmal parameter type"
+// The types are defined accroding to definition in  mmal_parameters_camera.h
+template <class T>
+struct MmalEnumBase {
+	typedef void basetype; // dummy
+};
+template <>
+struct MmalEnumBase<MMAL_PARAM_EXPOSUREMETERINGMODE_T> {
+	typedef MMAL_PARAMETER_EXPOSUREMETERINGMODE_T basetype;
+};
+template <>
+struct MmalEnumBase<MMAL_PARAM_EXPOSUREMODE_T> {
+	typedef MMAL_PARAMETER_EXPOSUREMODE_T basetype;
+};
+template <>
+struct MmalEnumBase<MMAL_PARAM_FLICKERAVOID_T> {
+	typedef MMAL_PARAMETER_FLICKERAVOID_T basetype;
+};
+template <>
+struct MmalEnumBase<MMAL_PARAM_AWBMODE_T> {
+	typedef MMAL_PARAMETER_AWBMODE_T basetype;
+};
+
+
+// ===== Members =====
 void CamConfig::SetDefault() 
 {
 	this->sharpness = 0;
@@ -678,6 +737,39 @@ int GetBoolean(MMAL_COMPONENT_T *camera, uint32_t id, bool *value)
 	return ret;
 }
 
+template <class MMAL_TYPE>
+int GetEnumedParam(MMAL_COMPONENT_T *camera, MMAL_TYPE* param)
+{
+	if (!camera)
+		return 1;
+	param->hdr.id = MmalCamParamTrait<MMAL_TYPE>::id;
+	param->hdr.size = sizeof(MMAL_TYPE);
+	
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &param->hdr);
+	
+	if( get_ret != 0)
+	{
+		p_err_logger->error(std::string("Unable to get ") + MmalCamParamTrait<MMAL_TYPE>::name + "setting");
+	}
+	return MmalstatusToMsg(get_ret);
+}
+
+template <typename MMAL_TYPE>
+int GetValuedParam(MMAL_COMPONENT_T *camera, MMAL_TYPE* param)
+{
+	if (!camera)
+		return 1;
+	typename MmalEnumBase<MMAL_TYPE>::basetype mmal_parameter;
+	
+	int ret = GetEnumedParam(camera, &mmal_parameter);
+	
+	if( ret )
+		return ret;
+	(*param) = mmal_parameter.value;
+	
+	return 0;
+}
 
 /**
  * Adjust the saturation level for images
@@ -847,27 +939,7 @@ int SetMeteringMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T 
 
 int GetMeteringMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_EXPOSUREMETERINGMODE_T* m_mode )
 {
-	if (!camera)
-		return 1;
-	MMAL_PARAMETER_EXPOSUREMETERINGMODE_T meter_mode = 
-	{
-		{
-			MMAL_PARAMETER_EXP_METERING_MODE,
-			sizeof(meter_mode)
-		},
-		MMAL_PARAM_EXPOSUREMETERINGMODE_MAX
-	};
-	
-	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &meter_mode.hdr);
-	if( get_ret == 0)
-	{
-		(*m_mode) = meter_mode.value;
-	}
-	else
-	{
-		p_err_logger->error("Unable to get exposure metering setting");
-	}
-	return MmalstatusToMsg(get_ret);
+	return GetValuedParam(camera, m_mode);
 }
 
 
@@ -942,27 +1014,7 @@ int SetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T mode)
 }
 int GetExposureMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_EXPOSUREMODE_T* e_mode )
 {
-	if (!camera)
-		return 1;
-	MMAL_PARAMETER_EXPOSUREMODE_T exp_mode = 
-	{
-		{
-			MMAL_PARAMETER_EXPOSURE_MODE,
-			sizeof(exp_mode)
-		},
-		MMAL_PARAM_EXPOSUREMODE_MAX
-	};
-	
-	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &exp_mode.hdr);
-	if( get_ret == 0)
-	{
-		(*e_mode) = exp_mode.value;
-	}
-	else
-	{
-		p_err_logger->error("Unable to get exposure setting");
-	}
-	return MmalstatusToMsg(get_ret);
+	return GetValuedParam(camera, e_mode);
 }
 
 
@@ -986,29 +1038,9 @@ int SetFlickerAvoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T mode
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &fl_mode.hdr));
 }
-int GetFlickerAvoidMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_FLICKERAVOID_T* e_mode )
+int GetFlickerAvoidMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_FLICKERAVOID_T* flk_mode )
 {
-	if (!camera)
-		return 1;
-	MMAL_PARAMETER_FLICKERAVOID_T fl_mode = 
-	{
-		{
-			MMAL_PARAMETER_FLICKER_AVOID,
-			sizeof(fl_mode)
-		},
-		MMAL_PARAM_FLICKERAVOID_MAX
-	};
-	
-	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &fl_mode.hdr);
-	if( get_ret == 0)
-	{
-		(*e_mode) = fl_mode.value;
-	}
-	else
-	{
-		p_err_logger->error("Unable to get flicker avoid mode setting");
-	}
-	return MmalstatusToMsg(get_ret);
+	return GetValuedParam(camera, flk_mode);
 }
 
 /**
@@ -1038,27 +1070,7 @@ int SetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T awb_mode)
 }
 int GetAwbMode(MMAL_COMPONENT_T* camera, MMAL_PARAM_AWBMODE_T* awb_mode )
 {
-	if (!camera)
-		return 1;
-	MMAL_PARAMETER_AWBMODE_T param = 
-	{
-		{
-			MMAL_PARAMETER_AWB_MODE,
-			sizeof(param)
-		},
-		MMAL_PARAM_AWBMODE_MAX
-	};
-	
-	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &param.hdr);
-	if( get_ret == 0)
-	{
-		(*awb_mode) = param.value;
-	}
-	else
-	{
-		p_err_logger->error("Unable to get AWB mode setting");
-	}
-	return MmalstatusToMsg(get_ret);
+	return GetValuedParam(camera, awb_mode);
 }
 
 int SetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain)
