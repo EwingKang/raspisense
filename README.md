@@ -3,7 +3,7 @@ RaspiSense project
 # Build project
 ```bash
 mkdir build && build/
-cmake ..
+cmake .. -G Ninja
 ninja
 ```
 

@@ -75,6 +75,18 @@ namespace RaspiCamControl
 		double w;
 		double h;
 	};
+	
+	struct Annotate
+	{
+		int settings;       /// Flag to enable the annotate, 0 = disabled, otherwise a bitmask of what needs to be displayed
+		char text[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V2]; /// String to use for annotate - overrides certain bitmask settings
+		int text_size;    // Text size for annotation
+		int text_colour;  // Text colour for annotation
+		int bg_colour;    // Background colour for annotation
+		unsigned int justify;
+		unsigned int x_offset;
+		unsigned int y_offset;
+	};
 
 	struct CamConfig
 	{
@@ -101,14 +113,7 @@ namespace RaspiCamControl
 		float awb_gains_b;         /// AWB blue gain
 		MMAL_PARAMETER_DRC_STRENGTH_T drc_level;  // Strength of Dynamic Range compression to apply
 		MMAL_BOOL_T stats_pass;    /// Stills capture statistics pass on/off
-		int enable_annotate;       /// Flag to enable the annotate, 0 = disabled, otherwise a bitmask of what needs to be displayed
-		char annotate_string[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V2]; /// String to use for annotate - overrides certain bitmask settings
-		int annotate_text_size;    // Text size for annotation
-		int annotate_text_colour;  // Text colour for annotation
-		int annotate_bg_colour;    // Background colour for annotation
-		unsigned int annotate_justify;
-		unsigned int annotate_x;
-		unsigned int annotate_y;
+		Annotate annotate_cfgs;
 
 		MMAL_PARAMETER_STEREOSCOPIC_MODE_T stereo_mode;
 		float analog_gain;         // Analog gain
@@ -255,9 +260,7 @@ namespace RaspiCamControl
 	int raspicamcontrol_set_DRC(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
 	int SetDrc(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
 	int SetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass);
-	int SetAnnotate(MMAL_COMPONENT_T *camera, const int bitmask, const char *string,
-									const int text_size, const int text_colour, const int bg_colour,
-									const unsigned int justify, const unsigned int x, const unsigned int y);
+	int SetAnnotate(MMAL_COMPONENT_T *camera, const Annotate &anno);
 	int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	

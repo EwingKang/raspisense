@@ -155,11 +155,11 @@ void CamConfig::SetDefault()
 	this->awb_gains_b = 0;
 	this->drc_level = MMAL_PARAMETER_DRC_STRENGTH_OFF;
 	this->stats_pass = MMAL_FALSE;
-	this->enable_annotate = 0;
-	this->annotate_string[0] = '\0';
-	this->annotate_text_size = 0;	//Use firmware default
-	this->annotate_text_colour = -1;   //Use firmware default
-	this->annotate_bg_colour = -1;     //Use firmware default
+	this->annotate_cfgs.settings = 0;
+	this->annotate_cfgs.text[0] = '\0';
+	this->annotate_cfgs.text_size = 0;	//Use firmware default
+	this->annotate_cfgs.text_colour = -1;   //Use firmware default
+	this->annotate_cfgs.bg_colour = -1;     //Use firmware default
 	this->stereo_mode.mode = MMAL_STEREOSCOPIC_MODE_NONE;
 	this->stereo_mode.decimate = MMAL_FALSE;
 	this->stereo_mode.swap_eyes = MMAL_FALSE;
@@ -547,11 +547,11 @@ void SetDefaults(CamConfig *params)
    params->awb_gains_b = 0;
    params->drc_level = MMAL_PARAMETER_DRC_STRENGTH_OFF;
    params->stats_pass = MMAL_FALSE;
-   params->enable_annotate = 0;
-   params->annotate_string[0] = '\0';
-   params->annotate_text_size = 0;	//Use firmware default
-   params->annotate_text_colour = -1;   //Use firmware default
-   params->annotate_bg_colour = -1;     //Use firmware default
+   params->annotate_cfgs.settings = 0;
+   params->annotate_cfgs.text[0] = '\0';
+   params->annotate_cfgs.text_size = 0;	//Use firmware default
+   params->annotate_cfgs.text_colour = -1;   //Use firmware default
+   params->annotate_cfgs.bg_colour = -1;     //Use firmware default
    params->stereo_mode.mode = MMAL_STEREOSCOPIC_MODE_NONE;
    params->stereo_mode.decimate = MMAL_FALSE;
    params->stereo_mode.swap_eyes = MMAL_FALSE;
@@ -624,13 +624,7 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
    result += SetShutterSpeed(camera, params->shutter_speed);
    result += SetDrc(camera, params->drc_level);
    result += SetStatsPass(camera, params->stats_pass);
-   result += SetAnnotate(camera, params->enable_annotate, params->annotate_string,
-                                          params->annotate_text_size,
-                                          params->annotate_text_colour,
-                                          params->annotate_bg_colour,
-                                          params->annotate_justify,
-                                          params->annotate_x,
-                                          params->annotate_y);
+   result += SetAnnotate(camera, params->annotate_cfgs);
    result += SetGains(camera, params->analog_gain, params->digital_gain);
 
    if (params->settings)
@@ -1513,16 +1507,14 @@ int GetStatsPass(MMAL_COMPONENT_T *camera, bool *stats_pass)
  *
  * @return 0 if successful, non-zero if any parameters out of range
  */
-int SetAnnotate(MMAL_COMPONENT_T *camera, const int settings, const char *string,
-                                 const int text_size, const int text_colour, const int bg_colour,
-                                 const unsigned int justify, const unsigned int x, const unsigned int y)
+int SetAnnotate(MMAL_COMPONENT_T *camera, const Annotate &anno)
 {
    //MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T annotate =
    //{{MMAL_PARAMETER_ANNOTATE, sizeof(MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T)}};
    MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T annotate;
    annotate.hdr = {MMAL_PARAMETER_ANNOTATE, sizeof(MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T)};
 
-   if (settings)
+   if (anno.settings)
    {
       time_t t = time(NULL);
       struct tm tm = *localtime(&t);
@@ -1531,22 +1523,22 @@ int SetAnnotate(MMAL_COMPONENT_T *camera, const int settings, const char *string
 
       annotate.enable = 1;
 
-      if (settings & (ANNOTATE_APP_TEXT | ANNOTATE_USER_TEXT))
+      if (anno.settings & (ANNOTATE_APP_TEXT | ANNOTATE_USER_TEXT))
       {
-         if ((settings & (ANNOTATE_TIME_TEXT | ANNOTATE_DATE_TEXT)) && strchr(string,'%') != NULL)
+         if ((anno.settings & (ANNOTATE_TIME_TEXT | ANNOTATE_DATE_TEXT)) && strchr(anno.text,'%') != NULL)
          {
-            //string contains strftime parameter?
-            strftime(annotate.text, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3, string, &tm );
+            //anno.text contains strftime parameter?
+            strftime(annotate.text, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3, anno.text, &tm );
             process_datetime = 0;
          }
          else
          {
-            strncpy(annotate.text, string, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3);
+            strncpy(annotate.text, anno.text, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3);
          }
          annotate.text[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3-1] = '\0';
       }
 
-      if (process_datetime && (settings & ANNOTATE_TIME_TEXT))
+      if (process_datetime && (anno.settings & ANNOTATE_TIME_TEXT))
       {
          if(strlen(annotate.text))
          {
@@ -1559,7 +1551,7 @@ int SetAnnotate(MMAL_COMPONENT_T *camera, const int settings, const char *string
          strncat(annotate.text, tmp, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3 - strlen(annotate.text) - 1);
       }
 
-      if (process_datetime && (settings & ANNOTATE_DATE_TEXT))
+      if (process_datetime && (anno.settings & ANNOTATE_DATE_TEXT))
       {
          if(strlen(annotate.text))
          {
@@ -1572,52 +1564,52 @@ int SetAnnotate(MMAL_COMPONENT_T *camera, const int settings, const char *string
          strncat(annotate.text, tmp, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3 - strlen(annotate.text) - 1);
       }
 
-      if (settings & ANNOTATE_SHUTTER_SETTINGS)
+      if (anno.settings & ANNOTATE_SHUTTER_SETTINGS)
          annotate.show_shutter = MMAL_TRUE;
 
-      if (settings & ANNOTATE_GAIN_SETTINGS)
+      if (anno.settings & ANNOTATE_GAIN_SETTINGS)
          annotate.show_analog_gain = MMAL_TRUE;
 
-      if (settings & ANNOTATE_LENS_SETTINGS)
+      if (anno.settings & ANNOTATE_LENS_SETTINGS)
          annotate.show_lens = MMAL_TRUE;
 
-      if (settings & ANNOTATE_CAF_SETTINGS)
+      if (anno.settings & ANNOTATE_CAF_SETTINGS)
          annotate.show_caf = MMAL_TRUE;
 
-      if (settings & ANNOTATE_MOTION_SETTINGS)
+      if (anno.settings & ANNOTATE_MOTION_SETTINGS)
          annotate.show_motion = MMAL_TRUE;
 
-      if (settings & ANNOTATE_FRAME_NUMBER)
+      if (anno.settings & ANNOTATE_FRAME_NUMBER)
          annotate.show_frame_num = MMAL_TRUE;
 
-      if (settings & ANNOTATE_BLACK_BACKGROUND)
+      if (anno.settings & ANNOTATE_BLACK_BACKGROUND)
          annotate.enable_text_background = MMAL_TRUE;
 
-      annotate.text_size = text_size;
+      annotate.text_size = anno.text_size;
 
-      if (text_colour != -1)
+      if (anno.text_colour != -1)
       {
          annotate.custom_text_colour = MMAL_TRUE;
-         annotate.custom_text_Y = text_colour&0xff;
-         annotate.custom_text_U = (text_colour>>8)&0xff;
-         annotate.custom_text_V = (text_colour>>16)&0xff;
+         annotate.custom_text_Y = anno.text_colour&0xff;
+         annotate.custom_text_U = (anno.text_colour>>8)&0xff;
+         annotate.custom_text_V = (anno.text_colour>>16)&0xff;
       }
       else
          annotate.custom_text_colour = MMAL_FALSE;
 
-      if (bg_colour != -1)
+      if (anno.bg_colour != -1)
       {
          annotate.custom_background_colour = MMAL_TRUE;
-         annotate.custom_background_Y = bg_colour&0xff;
-         annotate.custom_background_U = (bg_colour>>8)&0xff;
-         annotate.custom_background_V = (bg_colour>>16)&0xff;
+         annotate.custom_background_Y = anno.bg_colour&0xff;
+         annotate.custom_background_U = (anno.bg_colour>>8)&0xff;
+         annotate.custom_background_V = (anno.bg_colour>>16)&0xff;
       }
       else
          annotate.custom_background_colour = MMAL_FALSE;
 
-      annotate.justify = justify;
-      annotate.x_offset = x;
-      annotate.y_offset = y;
+      annotate.justify = anno.justify;
+      annotate.x_offset = anno.x_offset;
+      annotate.y_offset = anno.y_offset;
    }
    else
       annotate.enable = 0;

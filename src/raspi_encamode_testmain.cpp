@@ -631,15 +631,15 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 		// If parameter is a number, assume its a bitmask, otherwise a string
 		if (sscanf(arg_str.c_str(), "%u%c", &bitmask, &dummy) == 1)
 		{
-			params->enable_annotate |= bitmask;
+			params->annotate_cfgs.settings |= bitmask;
 		}
 		else
 		{
-			params->enable_annotate |= ANNOTATE_USER_TEXT;
+			params->annotate_cfgs.settings |= ANNOTATE_USER_TEXT;
 			//copy string char by char and replace "\n" with newline character
 			unsigned char c;
 			char const *s = arg_str.c_str();
-			char *t = &params->annotate_string[0];
+			char *t = &params->annotate_cfgs.text[0];
 			int n=0;
 			while ((c = *s++) && n < MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3-1)
 			{
@@ -686,12 +686,12 @@ static bool parse_cmdline(int argc, const char **argv, RaspiEncamodeConfig *conf
 	if( result.count("annotateex") ) {
 		// 3 parameters - text size (6-80), text colour (Hex VVUUYY) and background colour (Hex VVUUYY)
 		std::string arg_str = result["annotate"].as<std::string>();
-		sscanf(arg_str.c_str(), "%d,%d,%d,%u,%u,%u", &params->annotate_text_size,
-				&params->annotate_text_colour,
-				&params->annotate_bg_colour,
-				&params->annotate_justify,
-				&params->annotate_x,
-				&params->annotate_y
+		sscanf(arg_str.c_str(), "%d,%d,%d,%u,%u,%u", &params->annotate_cfgs.text_size,
+				&params->annotate_cfgs.text_colour,
+				&params->annotate_cfgs.bg_colour,
+				&params->annotate_cfgs.justify,
+				&params->annotate_cfgs.x_offset,
+				&params->annotate_cfgs.y_offset
 				);
 	}
 	if( result.count("analoggain") ) {
