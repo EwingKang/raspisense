@@ -1616,6 +1616,58 @@ int SetAnnotate(MMAL_COMPONENT_T *camera, const Annotate &anno)
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &annotate.hdr));
 }
+int GetAnnotate(MMAL_COMPONENT_T *camera, Annotate *anno)
+{
+	if( !camera ) return 1;
+	MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T annotate;
+	annotate.hdr = {MMAL_PARAMETER_ANNOTATE, sizeof(MMAL_PARAMETER_CAMERA_ANNOTATE_V4_T)};
+	
+	int ret = MmalstatusToMsg(mmal_port_parameter_get(camera->control, &annotate.hdr));
+	if( ret != 0 ) return 1;
+	
+	anno->settings = 0;
+	if( !annotate.enable)
+	{
+		return 0;
+	}
+	
+	anno->settings |= (0x01 & annotate.enable) << 0;
+	if(annotate.show_shutter == MMAL_TRUE )
+		anno->settings |= ANNOTATE_SHUTTER_SETTINGS;
+	if( annotate.show_analog_gain == MMAL_TRUE )
+		anno->settings |= ANNOTATE_GAIN_SETTINGS;
+	if( annotate.show_lens == MMAL_TRUE )
+		anno->settings |= ANNOTATE_LENS_SETTINGS;
+	if( annotate.show_caf == MMAL_TRUE )
+		anno->settings |= ANNOTATE_CAF_SETTINGS;
+    if( annotate.show_motion == MMAL_TRUE )
+		anno->settings |= ANNOTATE_MOTION_SETTINGS;
+	if( annotate.show_frame_num == MMAL_TRUE )
+		anno->settings |= ANNOTATE_FRAME_NUMBER;
+	if( annotate.enable_text_background == MMAL_TRUE )
+		anno->settings |= ANNOTATE_BLACK_BACKGROUND;
+	
+	strncpy(anno->text, annotate.text, MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3);
+	anno->text_size = annotate.text_size;
+	if( annotate.custom_text_colour == MMAL_TRUE)
+	{
+		anno->text_colour = annotate.custom_text_Y & 0xff;
+		anno->text_colour |= (annotate.custom_text_U & 0xff) << 8;
+		anno->text_colour |= (annotate.custom_text_V & 0xff) << 16;
+	}
+	else { anno->text_colour = -1; }
+	if( annotate.custom_background_colour == MMAL_TRUE)
+	{
+		anno->bg_colour = annotate.custom_background_Y  & 0xff;
+		anno->bg_colour |= (annotate.custom_background_U & 0xff) << 8;
+		anno->bg_colour |= (annotate.custom_background_V & 0xff) << 16;
+	}
+	else{ anno->bg_colour = -1; }
+	anno->justify = annotate.justify ;
+	anno->x_offset = annotate.x_offset;
+	anno->y_offset = annotate.y_offset;
+	return 0;
+}
 
 int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode)
 {

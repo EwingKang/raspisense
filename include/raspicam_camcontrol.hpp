@@ -79,7 +79,7 @@ namespace RaspiCamControl
 	struct Annotate
 	{
 		int settings;       /// Flag to enable the annotate, 0 = disabled, otherwise a bitmask of what needs to be displayed
-		char text[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V2]; /// String to use for annotate - overrides certain bitmask settings
+		char text[MMAL_CAMERA_ANNOTATE_MAX_TEXT_LEN_V3]; /// String to use for annotate - overrides certain bitmask settings
 		int text_size;    // Text size for annotation
 		int text_colour;  // Text colour for annotation
 		int bg_colour;    // Background colour for annotation
@@ -305,12 +305,7 @@ namespace RaspiCamControl
 	
 	int GetStereoMode(MMAL_PORT_T *port, MMAL_PARAMETER_STEREOSCOPIC_MODE_T *stereo_mode);
 	int GetGains(MMAL_COMPONENT_T *camera, float *analog, float *digital);
-	
-	/* TODO WIP : Write these get functions*/
-	int GetAnnotate(MMAL_COMPONENT_T *camera, const int bitmask, const char *string,
-									const int text_size, const int text_colour, const int bg_colour,
-									const unsigned int justify, const unsigned int x, const unsigned int y);
-	
+	int GetAnnotate(MMAL_COMPONENT_T *camera, Annotate *anno);
 	
 /* TBD
 int raspicamcontrol_cycle_test(MMAL_COMPONENT_T *camera);

@@ -598,25 +598,25 @@ static void update_annotation_data(RaspiEncamodeConfig *state)
       }
 
       raspicamcontrol_set_annotate(_p_camera_component, state->camera_parameters.enable_annotate, text,
-                                   state->camera_parameters.annotate_text_size,
-                                   state->camera_parameters.annotate_text_colour,
-                                   state->camera_parameters.annotate_bg_colour,
-                                   state->camera_parameters.annotate_justify,
-                                   state->camera_parameters.annotate_x,
-                                   state->camera_parameters.annotate_y
+                                   state->camera_parameters.annotate_cfg.text_size,
+                                   state->camera_parameters.annotate_cfg.text_colour,
+                                   state->camera_parameters.annotate_cfg.bg_colour,
+                                   state->camera_parameters.annotate_cfg.justify,
+                                   state->camera_parameters.annotate_cfg.x,
+                                   state->camera_parameters.annotate_cfg.y
                                   );
 
       free(text);
    }
    else
    {
-      raspicamcontrol_set_annotate(_p_camera_component, state->camera_parameters.enable_annotate, state->camera_parameters.annotate_string,
-                                   state->camera_parameters.annotate_text_size,
-                                   state->camera_parameters.annotate_text_colour,
-                                   state->camera_parameters.annotate_bg_colour,
-                                   state->camera_parameters.annotate_justify,
-                                   state->camera_parameters.annotate_x,
-                                   state->camera_parameters.annotate_y
+      raspicamcontrol_set_annotate(_p_camera_component, state->camera_parameters.enable_annotate, state->camera_parameters.annotate_cfg.string,
+                                   state->camera_parameters.annotate_cfg.text_size,
+                                   state->camera_parameters.annotate_cfg.text_colour,
+                                   state->camera_parameters.annotate_cfg.bg_colour,
+                                   state->camera_parameters.annotate_cfg.justify,
+                                   state->camera_parameters.annotate_cfg.x,
+                                   state->camera_parameters.annotate_cfg.y
                                   );
    }
 }*/
