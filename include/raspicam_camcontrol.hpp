@@ -232,7 +232,7 @@ namespace RaspiCamControl
 
 	void raspicamcontrol_check_configuration(int min_gpu_mem);
 
-	// Individual set functions
+	// ===== Individual set functions to MMAL =====
 	int SetSaturation(MMAL_COMPONENT_T *camera, int saturation);
 	int SetSharpness(MMAL_COMPONENT_T *camera, int sharpness);
 	int SetContrast(MMAL_COMPONENT_T *camera, int contrast);
@@ -249,10 +249,11 @@ namespace RaspiCamControl
 	int SetColourFX(MMAL_COMPONENT_T *camera, const MMAL_PARAMETER_COLOURFX_T *colourFX);
 	int SetRotation(MMAL_COMPONENT_T *camera, int rotation);
 	int SetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip);
-	int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect);
+	int SetRoi(MMAL_COMPONENT_T *camera, FloatRect rect);
 	int ZoomInOut(MMAL_COMPONENT_T *camera, ZOOM_COMMAND_T zoom_command, FloatRect *roi);
 	int SetShutterSpeed(MMAL_COMPONENT_T *camera, int speed_ms);
 	int raspicamcontrol_set_DRC(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
+	int SetDrc(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
 	int SetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass);
 	int SetAnnotate(MMAL_COMPONENT_T *camera, const int bitmask, const char *string,
 									const int text_size, const int text_colour, const int bg_colour,
@@ -260,9 +261,11 @@ namespace RaspiCamControl
 	int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
 	int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	
-	// Interface to mmal_util_params.h
-	// Return 0 means success
-	int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int* value);
+	
+	
+	// Easy interface to mmal_util_params.h, following ask for 
+	// camera-> control, return 0 means success
+	int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *num, int *den);
 	int GetUint32(MMAL_COMPONENT_T *camera, uint32_t id, uint32_t *value);
 	int GetInt32(MMAL_COMPONENT_T *camera, uint32_t id, int32_t *value);
 	int GetBoolean(MMAL_COMPONENT_T *camera, uint32_t id, bool *value);
@@ -274,7 +277,7 @@ namespace RaspiCamControl
 	template <typename MMAL_CAMPARAM_TYPE>
 	int GetValuedParam(MMAL_COMPONENT_T *camera, MMAL_CAMPARAM_TYPE* param);
 	
-	// Individual get functions
+	// ===== Individual get functions to MMAL =====
 	// Return: 0 means success
 	int GetSaturation(MMAL_COMPONENT_T *camera, int* saturation);
 	int GetSharpness(MMAL_COMPONENT_T *camera, int* sharpness);
@@ -287,24 +290,23 @@ namespace RaspiCamControl
 	int GetExposureMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_EXPOSUREMODE_T* mode);
 	int GetFlickerAvoidMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_FLICKERAVOID_T* mode);
 	int GetAwbMode(MMAL_COMPONENT_T *camera, MMAL_PARAM_AWBMODE_T* awb_mode);
+	int GetAwbGains(MMAL_COMPONENT_T *camera, float *r_gain, float *b_gain);
 	int GetImageFX(MMAL_COMPONENT_T *camera, MMAL_PARAM_IMAGEFX_T* imageFX);
 	int GetColourFX(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_COLOURFX_T* colourFX);
+	int GetRotation(MMAL_COMPONENT_T *camera, const unsigned int & output_ch, int rotation);
+	int GetFlips(MMAL_COMPONENT_T *camera, const unsigned int & output_ch, int hflip, int vflip);
+	int GetRoi(MMAL_COMPONENT_T *camera, FloatRect *rect);
+	int GetShutterSpeed(MMAL_COMPONENT_T *camera, uint32_t *speed_ms);
+	int GetDrc(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T *strength);
+	int GetStatsPass(MMAL_COMPONENT_T *camera, bool *stats_pass);
 	
+	int GetStereoMode(MMAL_PORT_T *port, MMAL_PARAMETER_STEREOSCOPIC_MODE_T *stereo_mode);
+	int GetGains(MMAL_COMPONENT_T *camera, float *analog, float *digital);
 	
-	/* WIP : Write these get functions*/
-	int GetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain);
-	int GetRotation(MMAL_COMPONENT_T *camera, int rotation);
-	int GetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip);
-	int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect);
-	int ZoomInOut(MMAL_COMPONENT_T *camera, ZOOM_COMMAND_T zoom_command, FloatRect *roi);
-	int GetShutterSpeed(MMAL_COMPONENT_T *camera, int speed_ms);
-	int raspicamcontrol_set_DRC(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength);
-	int GetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass);
+	/* TODO WIP : Write these get functions*/
 	int GetAnnotate(MMAL_COMPONENT_T *camera, const int bitmask, const char *string,
 									const int text_size, const int text_colour, const int bg_colour,
 									const unsigned int justify, const unsigned int x, const unsigned int y);
-	int GetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & stereo_mode);
-	int GetGains(MMAL_COMPONENT_T *camera, float analog, float digital);
 	
 	
 /* TBD

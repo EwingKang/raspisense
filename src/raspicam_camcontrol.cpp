@@ -620,9 +620,9 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
    //result += SetThumbnailParameters(camera, &params->thumbnailConfig);  TODO Not working for some reason
    result += SetRotation(camera, params->rotation);
    result += SetFlips(camera, params->hflip, params->vflip);
-   result += raspicamcontrol_set_ROI(camera, params->roi);
+   result += SetRoi(camera, params->roi);
    result += SetShutterSpeed(camera, params->shutter_speed);
-   result += raspicamcontrol_set_DRC(camera, params->drc_level);
+   result += SetDrc(camera, params->drc_level);
    result += SetStatsPass(camera, params->stats_pass);
    result += SetAnnotate(camera, params->enable_annotate, params->annotate_string,
                                           params->annotate_text_size,
@@ -654,7 +654,7 @@ int SetAllParameters(MMAL_COMPONENT_T *camera, const CamConfig *params)
 }
 
 
-int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value)
+int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *num, int *den)
 {
 	if( !camera )
 		return 1;
@@ -667,7 +667,8 @@ int GetRational(MMAL_COMPONENT_T *camera, uint32_t id, int *value)
    
 	if( ret == 0 )
 	{
-		(*value) = v_rat.num;
+		(*num) = v_rat.num;
+		(*den) = v_rat.den;
 	}
 	else
 	{
@@ -808,7 +809,8 @@ int SetSaturation(MMAL_COMPONENT_T *camera, int saturation)
 }
 int GetSaturation( MMAL_COMPONENT_T *camera, int *saturation)
 {
-	return GetRational(camera, MMAL_PARAMETER_SATURATION, saturation);
+	int den;
+	return GetRational(camera, MMAL_PARAMETER_SATURATION, saturation, &den);
 }
 
 /**
@@ -838,7 +840,8 @@ int SetSharpness(MMAL_COMPONENT_T *camera, int sharpness)
 }
 int GetSharpness(MMAL_COMPONENT_T *camera, int *sharpness)
 {
-   return GetRational(camera, MMAL_PARAMETER_SHARPNESS, sharpness);
+	int den;
+	return GetRational(camera, MMAL_PARAMETER_SHARPNESS, sharpness, &den);
 }
 
 /**
@@ -869,7 +872,8 @@ int SetContrast(MMAL_COMPONENT_T *camera, int contrast)
 }
 int GetContrast(MMAL_COMPONENT_T *camera, int *contrast)
 {
-   return GetRational(camera, MMAL_PARAMETER_CONTRAST, contrast);
+	int den;
+	return GetRational(camera, MMAL_PARAMETER_CONTRAST, contrast, &den);
 }
 
 
@@ -902,7 +906,8 @@ int SetBrightness(MMAL_COMPONENT_T *camera, int brightness)
 }
 int GetBrightness(MMAL_COMPONENT_T *camera, int *brightness)
 {
-   return GetRational(camera, MMAL_PARAMETER_BRIGHTNESS, brightness);
+	int den;
+	return GetRational(camera, MMAL_PARAMETER_BRIGHTNESS, brightness, &den);
 }
 
 /**
@@ -1097,6 +1102,32 @@ int SetAwbGains(MMAL_COMPONENT_T *camera, float r_gain, float b_gain)
    param.r_gain.den = param.b_gain.den = 65536;
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &param.hdr));
 }
+int GetAwbGains(MMAL_COMPONENT_T *camera, float *r_gain, float *b_gain)
+{
+	if (!camera)
+		return 1;
+   
+	MMAL_PARAMETER_AWB_GAINS_T awbgain = {
+		{
+			MMAL_PARAMETER_CUSTOM_AWB_GAINS,
+			sizeof(awbgain)
+		}, 
+		{0,65536}, {0,65536}
+	};
+	
+	MMAL_STATUS_T get_ret = mmal_port_parameter_get(camera->control, &awbgain.hdr);
+	if( get_ret == 0)
+	{
+		*r_gain = (float)awbgain.r_gain.num / (float)awbgain.r_gain.den;
+		*b_gain = (float)awbgain.b_gain.num / (float)awbgain.b_gain.den;
+	}
+	else
+	{
+		*r_gain = *b_gain = -1;
+		p_err_logger->error("Unable to get color effect settings");
+	}
+	return MmalstatusToMsg(get_ret);
+}
 
 /**
  * Set the image effect for the images
@@ -1205,6 +1236,21 @@ int SetRotation(MMAL_COMPONENT_T *camera, int rotation)
 
    return MmalstatusToMsg(ret);
 }
+int GetRotation(MMAL_COMPONENT_T *camera, unsigned int output_ch, int *rotation)
+{
+	if( !camera )
+		return 1;
+	if(output_ch > 2)
+		return -1;
+	
+	int ret = MmalstatusToMsg(mmal_port_parameter_get_int32(camera->output[output_ch], MMAL_PARAMETER_ROTATION, rotation));
+	if( ret != 0 )
+	{
+		ret = 1;
+		*rotation = 0;
+	}
+	return ret;
+}
 
 /**
  * Set the flips state of the image
@@ -1229,6 +1275,42 @@ int SetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip)
    mmal_port_parameter_set(camera->output[1], &mirror.hdr);
    return MmalstatusToMsg(mmal_port_parameter_set(camera->output[2], &mirror.hdr));
 }
+int GetFlips(MMAL_COMPONENT_T *camera, const unsigned int & output_ch,
+			 int *hflip, int *vflip)
+{
+	if( !camera ) return 1;
+	if( output_ch>2 ) return -1;
+	
+	MMAL_PARAMETER_MIRROR_T mirror = 
+	{
+	   { MMAL_PARAMETER_MIRROR, sizeof(MMAL_PARAMETER_MIRROR_T)},
+	   MMAL_PARAM_MIRROR_NONE
+	};
+
+	int ret = MmalstatusToMsg(mmal_port_parameter_get(camera->output[output_ch], &mirror.hdr));
+	if( ret != 0 )
+	{
+		ret = 1;
+		*hflip = *vflip = 0;
+	}
+	else
+	{
+		if(mirror.value == MMAL_PARAM_MIRROR_NONE) {
+			*hflip = *vflip = 0;
+		} else if(mirror.value == MMAL_PARAM_MIRROR_BOTH) {
+			*hflip = *vflip = 1;
+		} else if( mirror.value == MMAL_PARAM_MIRROR_HORIZONTAL ) {
+			*hflip = 1;
+			*vflip = 0;
+		} else if( mirror.value == MMAL_PARAM_MIRROR_VERTICAL ) {
+			*hflip = 0;
+			*vflip = 1;
+		} else {
+			p_err_logger->error("Unknown mirror settings");
+		}
+	}
+	return ret;
+}
 
 /**
  * Set the ROI of the sensor to use for captures/preview
@@ -1237,7 +1319,7 @@ int SetFlips(MMAL_COMPONENT_T *camera, int hflip, int vflip)
  *
  * @return 0 if successful, non-zero if any parameters out of range
  */
-int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect)
+int SetRoi(MMAL_COMPONENT_T *camera, FloatRect rect)
 {
    MMAL_PARAMETER_INPUT_CROP_T crop = {{MMAL_PARAMETER_INPUT_CROP, sizeof(MMAL_PARAMETER_INPUT_CROP_T)},{0,0,0,0}};
 
@@ -1247,6 +1329,29 @@ int raspicamcontrol_set_ROI(MMAL_COMPONENT_T *camera, FloatRect rect)
    crop.rect.height = (65536 * rect.h);
 
    return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &crop.hdr));
+}
+int GetRoi(MMAL_COMPONENT_T *camera, FloatRect *rect)
+{
+	if( !camera ) return 1;
+	MMAL_PARAMETER_INPUT_CROP_T crop = {
+		{MMAL_PARAMETER_INPUT_CROP, sizeof(MMAL_PARAMETER_INPUT_CROP_T)},
+		{0,0,0,0}
+	};
+
+	int ret = MmalstatusToMsg(mmal_port_parameter_get(camera->control, &crop.hdr));
+	if( ret != 0 )
+	{
+		ret = 1;
+		rect->x = rect->y = rect->w = rect->h = 0;
+	}
+	else
+	{
+		rect->x = (double)crop.rect.x / 65536 ;
+		rect->y = (double)crop.rect.y / 65536 ;
+		rect->w = (double)crop.rect.width / 65536;
+		rect->h = (double)crop.rect.height / 65536;
+	}
+	return ret;
 }
 
 /**
@@ -1338,6 +1443,12 @@ int SetShutterSpeed(MMAL_COMPONENT_T *camera, int speed)
 
    return MmalstatusToMsg(mmal_port_parameter_set_uint32(camera->control, MMAL_PARAMETER_SHUTTER_SPEED, speed));
 }
+int GetShutterSpeed(MMAL_COMPONENT_T *camera, uint32_t *speed_ms)
+{
+	if (!camera)
+		return 1;
+	return GetUint32(camera, MMAL_PARAMETER_SHUTTER_SPEED, speed_ms);
+}
 
 /**
  * Adjust the Dynamic range compression level
@@ -1350,14 +1461,33 @@ int SetShutterSpeed(MMAL_COMPONENT_T *camera, int speed)
  *
  * @return 0 if successful, non-zero if any parameters out of range
  */
-int raspicamcontrol_set_DRC(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength)
+int SetDrc(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T strength)
 {
-   MMAL_PARAMETER_DRC_T drc = {{MMAL_PARAMETER_DYNAMIC_RANGE_COMPRESSION, sizeof(MMAL_PARAMETER_DRC_T)}, strength};
+	MMAL_PARAMETER_DRC_T drc = {{MMAL_PARAMETER_DYNAMIC_RANGE_COMPRESSION, sizeof(MMAL_PARAMETER_DRC_T)}, strength};
 
-   if (!camera)
-      return 1;
+	if (!camera)
+		return 1;
 
-   return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &drc.hdr));
+	return MmalstatusToMsg(mmal_port_parameter_set(camera->control, &drc.hdr));
+}
+int GetDrc(MMAL_COMPONENT_T *camera, MMAL_PARAMETER_DRC_STRENGTH_T *strength)
+{
+	if (!camera) return 1;
+	MMAL_PARAMETER_DRC_T drc = {
+		{MMAL_PARAMETER_DYNAMIC_RANGE_COMPRESSION, sizeof(MMAL_PARAMETER_DRC_T)},
+		MMAL_PARAMETER_DRC_STRENGTH_OFF
+	};
+	
+	int ret = MmalstatusToMsg(mmal_port_parameter_get(camera->control, &drc.hdr));
+	if( ret != 0 )
+	{
+		ret = 1;
+	}
+	else
+	{
+		*strength = drc.strength;
+	}
+	return ret;
 }
 
 int SetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass)
@@ -1366,6 +1496,12 @@ int SetStatsPass(MMAL_COMPONENT_T *camera, int stats_pass)
       return 1;
 
    return MmalstatusToMsg(mmal_port_parameter_set_boolean(camera->control, MMAL_PARAMETER_CAPTURE_STATS_PASS, stats_pass));
+}
+int GetStatsPass(MMAL_COMPONENT_T *camera, bool *stats_pass)
+{
+   if (!camera)
+      return 1;
+   return GetBoolean( camera, MMAL_PARAMETER_CAPTURE_STATS_PASS, stats_pass );
 }
 
 
@@ -1502,6 +1638,28 @@ int SetStereoMode(MMAL_PORT_T *port, const MMAL_PARAMETER_STEREOSCOPIC_MODE_T & 
    }
    return MmalstatusToMsg(mmal_port_parameter_set(port, &stereo.hdr));
 }
+int GetStereoMode(MMAL_PORT_T *port, MMAL_PARAMETER_STEREOSCOPIC_MODE_T *stereo_mode)
+{
+	if( !port ) return 1;
+	
+	MMAL_PARAMETER_STEREOSCOPIC_MODE_T stereo = 
+	{
+		{MMAL_PARAMETER_STEREOSCOPIC_MODE, sizeof(stereo)},
+		MMAL_STEREOSCOPIC_MODE_NONE, MMAL_FALSE, MMAL_FALSE
+	};
+	int ret = MmalstatusToMsg(mmal_port_parameter_get(port, &stereo.hdr));
+	if( ret != 0 )
+	{
+		ret = 1;
+	}
+	else
+	{
+		stereo_mode->mode = stereo.mode;
+		stereo_mode->decimate = stereo.decimate;
+		stereo_mode->swap_eyes = stereo.swap_eyes;
+	}
+	return ret;
+}
 
 int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital)
 {
@@ -1519,6 +1677,21 @@ int SetGains(MMAL_COMPONENT_T *camera, float analog, float digital)
    rational.num = (unsigned int)(digital * 65536);
    status = mmal_port_parameter_set_rational(camera->control, MMAL_PARAMETER_DIGITAL_GAIN, rational);
    return MmalstatusToMsg(status);
+}
+int GetGains(MMAL_COMPONENT_T *camera, float *analog, float *digital)
+{
+	if (!camera) return 1;
+
+	int num, den, ret;
+	ret = GetRational(camera, MMAL_PARAMETER_ANALOG_GAIN, &num, &den);
+	if( ret ) return 1;
+	*analog = (float)num / (float)den;
+	
+	ret = GetRational(camera, MMAL_PARAMETER_DIGITAL_GAIN, &num, &den);
+	if( ret ) return 1;
+	*digital = (float)num / (float)den;
+	
+	return 0;
 }
 
 /**
