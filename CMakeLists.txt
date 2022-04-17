@@ -20,6 +20,7 @@ add_subdirectory(lib/spdlog)
 #cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
+set(RPICAMCPP_BUILD_EXAMPLES ON)
 add_subdirectory(module/rpicam_cpp)
 
 # ===== Compile settings =====
