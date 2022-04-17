@@ -20,6 +20,7 @@ add_subdirectory(lib/spdlog)
 #cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
+add_subdirectory(module/raspicam_cpp)
 
 # ===== Compile settings =====
 add_compile_options(-Wall -Wextra -pedantic)
@@ -41,34 +42,6 @@ target_link_libraries(ublox_gnss_library
 	spdlog
 )
 
-add_library(bcm_host IMPORTED SHARED)
-  #PATHS /opt/vc/lib/libbcm_host.so)
-target_include_directories(bcm_host
-  INTERFACE
-	/opt/vc/include
-)
-target_link_directories(bcm_host
-  INTERFACE
-	/opt/vc/lib
-)
-set_target_properties(bcm_host PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libbcm_host.so )
-
-add_library(mmal IMPORTED SHARED)
-target_include_directories(mmal
-  INTERFACE
-	/opt/vc/include/interface/mmal
-	/opt/vc/include     # for vcos required by mmal_common.h
-)
-set_target_properties(mmal PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libmmal.so )
-
-# Not currently directly needed
-add_library(vcos IMPORTED SHARED)
-target_include_directories(vcos
-  INTERFACE
-	/opt/vc/include/interface/vcos
-)
-set_target_properties(vcos PROPERTIES IMPORTED_LOCATION /opt/vc/lib/libvcos.so )
-
 add_library(raspisense
 	src/raspisense.cpp 
 	)
@@ -85,25 +58,6 @@ target_link_libraries(raspisense
 	stdc++fs
 )
 
-add_library(raspi_encamode
-	src/raspi_encamode.cpp
-	src/raspicam_camcontrol.cpp
-)
-target_include_directories(raspi_encamode
-  PUBLIC
-	include/
-	#dependencies/interface/mmal/
-	#dependencies/
-  PRIVATE
-)
-target_link_libraries(raspi_encamode
-  PUBLIC
-	mmal
-  PRIVATE
-	spdlog
-	bcm_host
-	#${raspicam_LIBS}
-)
 
 # ===== Executables =====
 add_executable(simpletest_raspicam 
@@ -147,13 +101,6 @@ target_link_libraries(m8n_test
 	cxxopts
 )
 
-add_executable(raspi_encamode_test
-	src/raspi_encamode_testmain.cpp)
-target_link_libraries(raspi_encamode_test
-  PRIVATE
-	cxxopts
-	raspi_encamode
-)
 
 add_executable(raspisense_main
 	src/raspisense_main.cpp 
