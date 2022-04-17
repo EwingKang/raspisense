@@ -7,6 +7,6 @@
 [submodule "module/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
-[submodule "module/raspicam_cpp"]
-	path = module/raspicam_cpp
-	url = git@github.com:EwingKang/raspicam-cpp.git
+[submodule "module/rpicam_cpp"]
+	path = module/rpicam_cpp
+	url = git@github.com:EwingKang/rpicam-cpp.git

@@ -20,7 +20,7 @@ add_subdirectory(lib/spdlog)
 #cmake_policy(SET CMP0048 OLD)
 add_subdirectory(lib/serial)
 
-add_subdirectory(module/raspicam_cpp)
+add_subdirectory(module/rpicam_cpp)
 
 # ===== Compile settings =====
 add_compile_options(-Wall -Wextra -pedantic)
